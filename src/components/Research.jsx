@@ -1,31 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { findEmails, getFinderStatus } from '../lib/emailFinderService';
 
 const Research = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [testing, setTesting] = useState({});
 
   const [companyName, setCompanyName] = useState('');
   const [domain, setDomain] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [selectedFinder, setSelectedFinder] = useState('auto');
 
   const [integrations, setIntegrations] = useState(null);
   const [finderStatus, setFinderStatus] = useState(null);
   const [searchHistory, setSearchHistory] = useState([]);
   const [quotaUsage, setQuotaUsage] = useState({});
 
-  useEffect(() => {
-    fetchIntegrations();
-    fetchSearchHistory();
-  }, [user]);
-
-  const fetchIntegrations = () => {
+  const fetchIntegrations = useCallback(() => {
     try {
       const stored = localStorage.getItem(`integrations_${user?.id}`);
       if (stored) {
@@ -36,9 +29,9 @@ const Research = () => {
     } catch (err) {
       console.error('Error fetching integrations:', err);
     }
-  };
+  }, [user?.id]);
 
-  const fetchSearchHistory = () => {
+  const fetchSearchHistory = useCallback(() => {
     try {
       const stored = localStorage.getItem(`search_history_${user?.id}`);
       if (stored) {
@@ -51,7 +44,12 @@ const Research = () => {
     } catch (err) {
       console.error('Error fetching history:', err);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchIntegrations();
+    fetchSearchHistory();
+  }, [user, fetchIntegrations, fetchSearchHistory]);
 
   const updateQuotaUsage = (finder) => {
     const newQuota = { ...quotaUsage };
@@ -62,7 +60,6 @@ const Research = () => {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    setSearching(true);
     setError('');
     setSuccess('');
 
@@ -129,8 +126,6 @@ const Research = () => {
     } catch (err) {
       console.error('Search error:', err);
       setError(err.message || 'Search failed');
-    } finally {
-      setSearching(false);
     }
   };
 
@@ -259,10 +254,9 @@ const Research = () => {
 
         <button
           type="submit"
-          disabled={searching}
-          className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition"
+          className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
         >
-          {searching ? 'Searching...' : 'Find Email'}
+          Find Email
         </button>
       </form>
 
