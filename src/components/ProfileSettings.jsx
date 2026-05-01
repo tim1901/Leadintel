@@ -4,7 +4,6 @@ import { supabase, getUserProfile } from '../lib/supabaseClient';
 
 const ProfileSettings = () => {
   const { user } = useAuth();
-  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -23,7 +22,6 @@ const ProfileSettings = () => {
       setLoading(true);
       const profileData = await getUserProfile(user.id);
       if (profileData) {
-        setProfile(profileData);
         setFormData({
           name: profileData.name || '',
           service_name: profileData.service_name || '',
