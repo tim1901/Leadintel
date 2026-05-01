@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import SendEmailModal from './SendEmailModal';
 
 const Outreach = () => {
-  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -14,7 +12,7 @@ const Outreach = () => {
     prospectEmail: '',
     prospectTitle: '',
     painPoint: '',
-    angle: 'executive', // executive, operational, technical
+    angle: 'executive',
   });
 
   const [generatedEmails, setGeneratedEmails] = useState([]);
@@ -42,8 +40,6 @@ const Outreach = () => {
         return;
       }
 
-      // For now, we'll create sample emails
-      // In production, this would call Claude API via Netlify function
       const sampleEmails = {
         executive: {
           subject: `${formData.painPoint ? `Help ${formData.companyName} with ${formData.painPoint}` : `Partnership with ${formData.companyName}`}`,
@@ -150,7 +146,6 @@ LeadIntel Team`
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Generate & Send Outreach</h1>
         <p className="text-gray-600 mt-1">Create personalized emails and send via Resend</p>
@@ -159,7 +154,6 @@ LeadIntel Team`
       {error && <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
       {success && <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">{success}</div>}
 
-      {/* Generate Form */}
       <form onSubmit={handleGenerateOutreach} className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-4">
         <h2 className="text-xl font-bold text-gray-900 mb-6">Step 1: Enter Prospect Details</h2>
 
@@ -234,7 +228,6 @@ LeadIntel Team`
         </button>
       </form>
 
-      {/* Generated Emails */}
       {generatedEmails.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-gray-900">Step 2: Choose & Send</h2>
@@ -261,19 +254,12 @@ LeadIntel Team`
                 >
                   Send This Email
                 </button>
-                <button
-                  type="button"
-                  className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition"
-                >
-                  Edit
-                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Send Email Modal */}
       {selectedEmail && (
         <SendEmailModal
           isOpen={showSendModal}
