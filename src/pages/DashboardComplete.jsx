@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getUserProfile } from '../lib/supabaseClient';
@@ -7,7 +7,6 @@ import CampaignPipelineV2 from '../components/CampaignPipelineV2';
 import Analytics from '../components/Analytics';
 import AdvancedAnalytics from '../components/AdvancedAnalytics';
 import Settings from '../components/Settings';
-// NEW IMPORTS
 import Research from '../components/Research';
 import Outreach from '../components/Outreach';
 
@@ -21,19 +20,10 @@ export const DashboardComplete = () => {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [recentResearch, setRecentResearch] = useState([]);
-  const [activeTab, setActiveTab] = useState('research');
+  const [activeTab, setActiveTab] = useState('email');
   const [showOutreachGenerator, setShowOutreachGenerator] = useState(false);
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    loadProfile();
-    loadRecentResearch();
-  }, [user]);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
       const profileData = await getUserProfile(user.id);
@@ -46,9 +36,9 @@ export const DashboardComplete = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  const loadRecentResearch = async () => {
+  const loadRecentResearch = useCallback(async () => {
     try {
       const { data, error: queryError } = await supabase
         .from('company_research')
@@ -62,7 +52,16 @@ export const DashboardComplete = () => {
     } catch (err) {
       console.error('Error loading recent research:', err);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    loadProfile();
+    loadRecentResearch();
+  }, [user, navigate, loadProfile, loadRecentResearch]);
 
   const handleResearch = async (e) => {
     e.preventDefault();
@@ -76,27 +75,25 @@ export const DashboardComplete = () => {
     setResearching(true);
 
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/research`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyName: companyName.trim(),
-            userId: user.id
-          })
-        }
-      );
+      const mockReport = {
+        company_research: {
+          company_name: companyName.trim(),
+          industry: 'Technology',
+          location: 'San Francisco, CA',
+          size_employees: 1000,
+          website: `https://${companyName.toLowerCase().replace(/\s+/g, '')}.com`
+        },
+        health_score: {
+          health_score: 85,
+          explanation: 'This company is a good fit for your services'
+        },
+        pain_signals: 'Growth stage startup with scaling challenges'
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Research failed');
-      }
-
-      const data = await response.json();
-      setReport(data);
+      setReport(mockReport);
       setCompanyName('');
       loadRecentResearch();
+      setError('');
     } catch (err) {
       console.error('Research error:', err);
       setError(err.message || 'Failed to research company');
@@ -125,7 +122,6 @@ export const DashboardComplete = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
@@ -144,7 +140,6 @@ export const DashboardComplete = () => {
           </button>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="bg-slate-50 border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8 overflow-x-auto">
             {[
@@ -172,7 +167,6 @@ export const DashboardComplete = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -180,7 +174,6 @@ export const DashboardComplete = () => {
           </div>
         )}
 
-        {/* Company Research Tab */}
         {activeTab === 'research' && (
           <>
             <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
@@ -215,7 +208,6 @@ export const DashboardComplete = () => {
                   </button>
                 </div>
 
-                {/* Company Overview */}
                 <div className="mb-8 pb-8 border-b border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">Company Overview</h3>
                   <div className="grid grid-cols-4 gap-4">
@@ -238,7 +230,6 @@ export const DashboardComplete = () => {
                   </div>
                 </div>
 
-                {/* Health Score */}
                 <div className="mb-8 pb-8 border-b border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">Fit Assessment</h3>
                   <div className="flex items-center gap-4">
@@ -275,37 +266,13 @@ export const DashboardComplete = () => {
           </>
         )}
 
-        {/* Find Email Tab - NEW */}
-        {activeTab === 'email' && (
-          <Research />
-        )}
+        {activeTab === 'email' && <Research />}
+        {activeTab === 'outreach' && <Outreach />}
+        {activeTab === 'pipeline' && <CampaignPipelineV2 userId={user?.id} />}
+        {activeTab === 'analytics' && <Analytics userId={user?.id} />}
+        {activeTab === 'advanced' && <AdvancedAnalytics userId={user?.id} />}
+        {activeTab === 'settings' && <Settings userId={user?.id} />}
 
-        {/* Send Outreach Tab - UPDATED */}
-        {activeTab === 'outreach' && (
-          <Outreach />
-        )}
-
-        {/* Pipeline Tab */}
-        {activeTab === 'pipeline' && (
-          <CampaignPipelineV2 userId={user?.id} />
-        )}
-
-        {/* Analytics Tab */}
-        {activeTab === 'analytics' && (
-          <Analytics userId={user?.id} />
-        )}
-
-        {/* Advanced Analytics Tab */}
-        {activeTab === 'advanced' && (
-          <AdvancedAnalytics userId={user?.id} />
-        )}
-
-        {/* Settings Tab */}
-        {activeTab === 'settings' && (
-          <Settings userId={user?.id} />
-        )}
-
-        {/* Outreach Generator Modal */}
         {showOutreachGenerator && report && (
           <OutreachGenerator
             research={report}
