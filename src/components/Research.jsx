@@ -6,7 +6,6 @@ const Research = () => {
   const { user } = useAuth();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [testing, setTesting] = useState({});
 
   const [companyName, setCompanyName] = useState('');
   const [domain, setDomain] = useState('');
@@ -74,7 +73,6 @@ const Research = () => {
         return;
       }
 
-      // Check if any finders are connected
       const connectedFinders = Object.entries(integrations)
         .filter(([key, value]) => key.endsWith('_api_key') && value)
         .map(([key]) => key.replace('_api_key', ''));
@@ -88,7 +86,6 @@ const Research = () => {
       console.log('Domain:', domain);
       console.log('Connected finders:', connectedFinders);
 
-      // Find emails
       const result = await findEmails(
         domain,
         integrations,
@@ -100,7 +97,6 @@ const Research = () => {
         setSuccess(`✅ Found ${result.emails.length} email(s) via ${result.source}!`);
         updateQuotaUsage(result.source);
 
-        // Add to history
         const newEntry = {
           id: Date.now(),
           companyName,
@@ -115,7 +111,6 @@ const Research = () => {
         setSearchHistory(newHistory);
         localStorage.setItem(`search_history_${user?.id}`, JSON.stringify(newHistory));
 
-        // Clear form
         setCompanyName('');
         setDomain('');
         setFirstName('');
@@ -134,7 +129,6 @@ const Research = () => {
   };
 
   const getTotalQuotaAvailable = () => {
-    // 50 + 50 + 100 + 50 + 100 + 50 = 400
     return 400;
   };
 
@@ -156,13 +150,11 @@ const Research = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Email Research</h1>
         <p className="text-gray-600 mt-1">Find email addresses for your prospects using AI</p>
       </div>
 
-      {/* Quota Usage */}
       {finderStatus && finderStatus.totalConnected > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
           <div className="flex justify-between items-start mb-4">
@@ -177,7 +169,6 @@ const Research = () => {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="w-full bg-blue-200 rounded-full h-3">
             <div
               className="bg-blue-600 h-3 rounded-full transition-all"
@@ -185,7 +176,6 @@ const Research = () => {
             />
           </div>
 
-          {/* Breakdown by finder */}
           <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
             {['hunter', 'rocketreach', 'clearbit', 'findthatemail', 'emailhippo', 'violanorbert'].map(finder => (
               integrations[`${finder}_api_key`] && (
@@ -202,7 +192,6 @@ const Research = () => {
       {error && <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
       {success && <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">{success}</div>}
 
-      {/* Search Form */}
       <form onSubmit={handleSearch} className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
         <h2 className="text-xl font-bold text-gray-900 mb-6">Find Email</h2>
 
@@ -260,7 +249,6 @@ const Research = () => {
         </button>
       </form>
 
-      {/* Search History */}
       {searchHistory.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
           <h2 className="text-xl font-bold text-gray-900 mb-6">Recent Searches</h2>
