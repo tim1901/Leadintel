@@ -1,0 +1,21 @@
+[build]
+  command = "npm run build"
+  functions = "netlify/functions"
+  publish = "build"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  timeout = 60
+  memory = 1024
+
+[[env]]
+  context = "production"
+
+[[env.production.environment]]
+  ANTHROPIC_API_KEY = "$ANTHROPIC_API_KEY"
