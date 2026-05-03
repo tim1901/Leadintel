@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { findEmails, getFinderStatus } from '../lib/emailFinderService';
 
 const Research = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -132,6 +135,11 @@ const Research = () => {
     return 400;
   };
 
+  // ✅ FIXED: Navigate to settings tab via URL
+  const handleGoToSettings = () => {
+    setSearchParams({ tab: 'settings' });
+  };
+
   if (!integrations) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -140,9 +148,12 @@ const Research = () => {
           <p className="text-yellow-800 text-sm mb-3">
             You need to connect your email finders first to search for emails.
           </p>
-          <a href="/settings#integrations" className="text-blue-600 hover:underline text-sm font-medium">
+          <button
+            onClick={handleGoToSettings}
+            className="text-blue-600 hover:underline text-sm font-medium"
+          >
             Go to Settings → Integrations →
-          </a>
+          </button>
         </div>
       </div>
     );
