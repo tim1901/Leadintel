@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase, getUserProfile } from '../lib/supabaseClient';
+import { supabase, getUserProfile, getCompanyResearch, createCompanyResearch } from '../lib/supabaseClient';
 import OutreachGenerator from '../components/OutreachGenerator';
 import CampaignPipelineV2 from '../components/CampaignPipelineV2';
 import Analytics from '../components/Analytics';
@@ -40,14 +40,7 @@ export const DashboardComplete = () => {
 
   const loadRecentResearch = useCallback(async () => {
     try {
-      const { data, error: queryError } = await supabase
-        .from('company_research')
-        .select('research_id, company_name, health_score, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (queryError) throw queryError;
+      const data = await getCompanyResearch(user.id);
       setRecentResearch(data || []);
     } catch (err) {
       console.error('Error loading recent research:', err);
@@ -75,28 +68,70 @@ export const DashboardComplete = () => {
     setResearching(true);
 
     try {
-      const mockReport = {
+      console.log(`Starting research for: ${companyName}`);
+
+      // ✅ CALL CLAUDE API VIA NETLIFY FUNCTION
+      const response = await fetch('/.netlify/functions/research-simple', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          company_name: companyName.trim()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success || !data.research) {
+        throw new Error('Invalid response from research API');
+      }
+
+      const research = data.research;
+
+      // ✅ SAVE TO SUPABASE
+      if (user.id) {
+        await createCompanyResearch(user.id, {
+          company_name: research.company_name || companyName,
+          industry: research.industry,
+          company_size: research.size_employees,
+          location: research.location,
+          website: research.website,
+          health_score: research.health_score || 85,
+          pain_signals: research.pain_signals,
+        });
+      }
+
+      // ✅ DISPLAY REPORT
+      setReport({
         company_research: {
-          company_name: companyName.trim(),
-          industry: 'Technology',
-          location: 'San Francisco, CA',
-          size_employees: 1000,
-          website: `https://${companyName.toLowerCase().replace(/\s+/g, '')}.com`
+          company_name: research.company_name || companyName,
+          industry: research.industry || 'Unknown',
+          location: research.location || 'Unknown',
+          size_employees: research.size_employees || 'Unknown',
+          website: research.website || 'Unknown',
+          founded_year: research.founded_year || 'Unknown'
         },
         health_score: {
-          health_score: 85,
-          explanation: 'This company is a good fit for your services'
+          health_score: research.health_score || 85,
+          explanation: research.engagement_recommendation || 'Good potential fit'
         },
-        pain_signals: 'Growth stage startup with scaling challenges'
-      };
+        pain_signals: research.pain_signals || 'No specific pain signals identified',
+        recent_news: research.recent_news || 'No recent news available',
+        budget_likelihood: research.budget_likelihood || 7,
+        solution_seeking_likelihood: research.solution_seeking_likelihood || 8
+      });
 
-      setReport(mockReport);
       setCompanyName('');
       loadRecentResearch();
       setError('');
     } catch (err) {
       console.error('Research error:', err);
-      setError(err.message || 'Failed to research company');
+      setError(err.message || 'Failed to research company. Please try again.');
     } finally {
       setResearching(false);
     }
@@ -128,7 +163,7 @@ export const DashboardComplete = () => {
             <h1 className="text-2xl font-bold text-slate-900">LeadIntel</h1>
             {profile && (
               <p className="text-sm text-slate-600 mt-1">
-                Welcome, {profile.name}! • {profile.service_name}
+                Welcome, {profile.name}! • {profile.service_name || 'Setup your profile'}
               </p>
             )}
           </div>
@@ -183,7 +218,7 @@ export const DashboardComplete = () => {
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Enter company name (e.g., Tesla, Stripe, AccessBank)"
+                  placeholder="Enter company name (e.g., Tesla, Stripe, Airbnb)"
                   className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
@@ -194,6 +229,11 @@ export const DashboardComplete = () => {
                   {researching ? 'Researching...' : 'Research'}
                 </button>
               </form>
+              {researching && (
+                <p className="text-sm text-slate-600 mt-4">
+                  🔍 Analyzing company with Claude AI... (this may take 10-20 seconds)
+                </p>
+              )}
             </div>
 
             {report && (
@@ -210,7 +250,7 @@ export const DashboardComplete = () => {
 
                 <div className="mb-8 pb-8 border-b border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">Company Overview</h3>
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <p className="text-sm text-slate-600">Company</p>
                       <p className="text-lg font-semibold text-slate-900">{report.company_research?.company_name}</p>
@@ -225,14 +265,14 @@ export const DashboardComplete = () => {
                     </div>
                     <div>
                       <p className="text-sm text-slate-600">Size</p>
-                      <p className="text-lg font-semibold text-slate-900">{report.company_research?.size_employees} employees</p>
+                      <p className="text-lg font-semibold text-slate-900">{report.company_research?.size_employees}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="mb-8 pb-8 border-b border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">Fit Assessment</h3>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 mb-6">
                     <div className="text-5xl font-bold text-blue-600">
                       {report.health_score?.health_score}
                     </div>
@@ -246,7 +286,34 @@ export const DashboardComplete = () => {
                       </div>
                     </div>
                   </div>
+
+                  {report.budget_likelihood && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 p-4 rounded">
+                        <p className="text-sm text-slate-600">Budget Likelihood</p>
+                        <p className="text-2xl font-bold text-slate-900">{report.budget_likelihood}/10</p>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded">
+                        <p className="text-sm text-slate-600">Solution-Seeking</p>
+                        <p className="text-2xl font-bold text-slate-900">{report.solution_seeking_likelihood}/10</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                {report.pain_signals && (
+                  <div className="mb-8 pb-8 border-b border-slate-200">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Pain Signals</h3>
+                    <p className="text-slate-600">{report.pain_signals}</p>
+                  </div>
+                )}
+
+                {report.recent_news && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent News</h3>
+                    <p className="text-slate-600">{report.recent_news}</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -255,9 +322,9 @@ export const DashboardComplete = () => {
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Research</h3>
                 <div className="space-y-2">
                   {recentResearch.map(research => (
-                    <div key={research.research_id} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+                    <div key={research.id} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
                       <p className="font-semibold text-slate-900">{research.company_name}</p>
-                      <p className="text-sm text-slate-600">Score: {research.health_score}</p>
+                      <p className="text-sm text-slate-600">Health Score: {research.health_score || 'N/A'} | Industry: {research.industry || 'N/A'}</p>
                     </div>
                   ))}
                 </div>
