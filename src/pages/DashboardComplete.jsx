@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, getUserProfile, getCompanyResearch, createCompanyResearch } from '../lib/supabaseClient';
 import OutreachGenerator from '../components/OutreachGenerator';
 import CampaignPipelineV2 from '../components/CampaignPipelineV2';
@@ -13,6 +13,11 @@ import Outreach from '../components/Outreach';
 export const DashboardComplete = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // ✅ FIXED: Get active tab from URL query param
+  const activeTab = searchParams.get('tab') || 'email';
+  
   const [profile, setProfile] = useState(null);
   const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,7 +25,6 @@ export const DashboardComplete = () => {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [recentResearch, setRecentResearch] = useState([]);
-  const [activeTab, setActiveTab] = useState('email');
   const [showOutreachGenerator, setShowOutreachGenerator] = useState(false);
 
   const loadProfile = useCallback(async () => {
@@ -56,6 +60,11 @@ export const DashboardComplete = () => {
     loadRecentResearch();
   }, [user, navigate, loadProfile, loadRecentResearch]);
 
+  // ✅ FIXED: Function to change tabs via URL
+  const handleTabChange = (tabId) => {
+    setSearchParams({ tab: tabId });
+  };
+
   const handleResearch = async (e) => {
     e.preventDefault();
     setError('');
@@ -70,7 +79,6 @@ export const DashboardComplete = () => {
     try {
       console.log(`Starting research for: ${companyName}`);
 
-      // ✅ CALL CLAUDE API VIA NETLIFY FUNCTION
       const response = await fetch('/.netlify/functions/research-simple', {
         method: 'POST',
         headers: {
@@ -93,7 +101,6 @@ export const DashboardComplete = () => {
 
       const research = data.research;
 
-      // ✅ SAVE TO SUPABASE
       if (user.id) {
         await createCompanyResearch(user.id, {
           company_name: research.company_name || companyName,
@@ -106,7 +113,6 @@ export const DashboardComplete = () => {
         });
       }
 
-      // ✅ DISPLAY REPORT
       setReport({
         company_research: {
           company_name: research.company_name || companyName,
@@ -155,6 +161,16 @@ export const DashboardComplete = () => {
     );
   }
 
+  const tabs = [
+    { id: 'research', label: 'Company Research', icon: '🔍' },
+    { id: 'email', label: 'Find Email', icon: '📧' },
+    { id: 'outreach', label: 'Send Outreach', icon: '✉️' },
+    { id: 'pipeline', label: 'Pipeline', icon: '📊' },
+    { id: 'analytics', label: 'Analytics', icon: '📈' },
+    { id: 'advanced', label: 'Advanced', icon: '🔬' },
+    { id: 'settings', label: 'Settings', icon: '⚙️' }
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <header className="bg-white shadow-sm border-b border-slate-200">
@@ -177,18 +193,10 @@ export const DashboardComplete = () => {
 
         <div className="bg-slate-50 border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8 overflow-x-auto">
-            {[
-              { id: 'research', label: 'Company Research', icon: '🔍' },
-              { id: 'email', label: 'Find Email', icon: '📧' },
-              { id: 'outreach', label: 'Send Outreach', icon: '✉️' },
-              { id: 'pipeline', label: 'Pipeline', icon: '📊' },
-              { id: 'analytics', label: 'Analytics', icon: '📈' },
-              { id: 'advanced', label: 'Advanced', icon: '🔬' },
-              { id: 'settings', label: 'Settings', icon: '⚙️' }
-            ].map(tab => (
+            {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`py-4 px-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-600'
