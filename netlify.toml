@@ -2,6 +2,15 @@
 command = "npm run build"
 publish = "build"
 
+[functions]
+node_bundler = "esbuild"
+included_files = ["netlify/functions/**"]
+
+[[functions]]
+node_runtime = "nodejs20.x"
+memory = 1024
+timeout = 60
+
 [[redirects]]
 from = "/*"
 to = "/index.html"
