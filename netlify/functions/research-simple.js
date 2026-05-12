@@ -14,20 +14,21 @@ const supabase = createClient(
   process.env.REACT_APP_SUPABASE_ANON_KEY
 );
 
-// Fetch user profile from Supabase
+// Fetch user profile from Supabase (handle missing profiles gracefully)
 async function getUserProfile(userId) {
   try {
     const { data, error } = await supabase
       .from("user_profiles")
       .select("*")
-      .eq("id", userId)
-      .single();
+      .eq("id", userId);
 
     if (error) {
       console.error("Error fetching user profile:", error);
       return null;
     }
-    return data;
+    
+    // Return first result or null if no profile exists
+    return data && data.length > 0 ? data[0] : null;
   } catch (err) {
     console.error("getUserProfile error:", err);
     return null;
@@ -47,6 +48,9 @@ Their messaging style: ${userProfile.messaging_style || "professional"}
 
 CRITICAL: Research this company specifically for fit with this user's solution. 
 Tailor all recommendations to their service.`;
+  } else {
+    userContext = `
+Note: User profile not yet filled in. Provide comprehensive research without personalization.`;
   }
 
   const systemPrompt = `You are an elite business development strategist with 25+ years of enterprise sales experience.
@@ -70,7 +74,8 @@ Respond ONLY in valid JSON format with no additional text, no markdown, no code 
 
   const userPrompt = `Conduct ELITE business development research for: ${companyName}
 
-Analyze this company SPECIFICALLY for fit with the user's solution.
+${userProfile ? `Analyze this company SPECIFICALLY for fit with the user's solution.` : `Provide comprehensive company research for general B2B sales targeting.`}
+
 Provide comprehensive, actionable analysis in this JSON structure:
 
 {
@@ -190,7 +195,7 @@ REQUIREMENTS:
     console.log("Calling Claude with personalized prompt...");
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 8000, // Increased for ultra-deep analysis
+      max_tokens: 8000,
       system: systemPrompt,
       messages: [
         {
@@ -249,12 +254,14 @@ exports.handler = async (event, context) => {
 
     console.log(`Starting research for: ${company_name}${userId ? ` (User: ${userId})` : ""}`);
 
-    // Fetch user profile if userId provided
+    // Fetch user profile if userId provided (won't fail if profile doesn't exist)
     let userProfile = null;
     if (userId) {
       userProfile = await getUserProfile(userId);
       if (userProfile) {
         console.log(`Loaded user profile: ${userProfile.service_name}`);
+      } else {
+        console.log(`No user profile found for userId: ${userId}`);
       }
     }
 
