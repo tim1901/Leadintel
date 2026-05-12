@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase, getUserProfile, getCompanyResearch, createCompanyResearch } from '../lib/supabaseClient';
+import { getUserProfile, getCompanyResearch, createCompanyResearch } from '../lib/supabaseClient';
 import OutreachGenerator from '../components/OutreachGenerator';
 import CampaignPipelineV2 from '../components/CampaignPipelineV2';
 import Analytics from '../components/Analytics';
