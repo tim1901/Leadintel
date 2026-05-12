@@ -5,7 +5,7 @@ import { findEmails, getFinderStatus } from '../lib/emailFinderService';
 
 const Research = () => {
   const { user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
