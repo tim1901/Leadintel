@@ -75,9 +75,8 @@ export const DashboardComplete = () => {
     setResearching(true);
 
     try {
-      console.log(`Starting personalized research for: ${companyName}`);
+      console.log(`Starting ELITE research for: ${companyName}`);
 
-      // ✅ PASS userId to research function
       const response = await fetch('/.netlify/functions/research-simple', {
         method: 'POST',
         headers: {
@@ -85,7 +84,7 @@ export const DashboardComplete = () => {
         },
         body: JSON.stringify({
           company_name: companyName.trim(),
-          userId: user.id  // ← NEW: Send user ID for personalization
+          userId: user.id
         })
       });
 
@@ -101,7 +100,6 @@ export const DashboardComplete = () => {
 
       const research = data.research;
 
-      // Save to Supabase
       if (user.id) {
         await createCompanyResearch(user.id, {
           company_name: research.company_name || companyName,
@@ -109,12 +107,11 @@ export const DashboardComplete = () => {
           company_size: research.company_size,
           location: research.location,
           website: research.website,
-          health_score: research.deal_probability?.probability_percentage || 85,
-          pain_signals: research.pain_signals_specific,
+          health_score: research.deal_probability || 65,
+          pain_signals: research.actual_problem_they_face,
         });
       }
 
-      // Set report with full deep research
       setReport(research);
       setCompanyName('');
       loadRecentResearch();
@@ -204,16 +201,16 @@ export const DashboardComplete = () => {
         {activeTab === 'research' && (
           <>
             <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-              <h2 className="text-xl font-bold text-slate-900 mb-4">Research a Company</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-4">Elite Company Research</h2>
               <p className="text-sm text-slate-600 mb-4">
-                💡 Your research will be personalized based on your profile: <strong>{profile?.service_name || 'Complete your profile'}</strong>
+                💡 25-year BD veteran level research: Social sentiment, news, trends, urgency positioning
               </p>
               <form onSubmit={handleResearch} className="flex gap-4">
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Enter company name (e.g., Tesla, Stripe, Airbnb)"
+                  placeholder="Enter company name (e.g., Tesla, Magdalena's Daughters, Stripe)"
                   className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
@@ -226,163 +223,211 @@ export const DashboardComplete = () => {
               </form>
               {researching && (
                 <p className="text-sm text-slate-600 mt-4">
-                  🔍 Analyzing company with elite BD intelligence... (this may take 15-30 seconds for deep analysis)
+                  🔍 Elite BD research in progress... (analyzing social sentiment, news, trends, and positioning strategy)
                 </p>
               )}
             </div>
 
             {report && (
-              <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold text-slate-900">{report.company_name}</h2>
-                    <p className="text-slate-600 mt-1">Elite Business Development Research</p>
-                  </div>
-                  <button
-                    onClick={() => setShowOutreachGenerator(true)}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                  >
-                    Generate Outreach
-                  </button>
-                </div>
-
+              <div className="space-y-6">
                 {/* Executive Summary */}
                 {report.executive_summary && (
-                  <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h3 className="font-bold text-blue-900 mb-2">Executive Summary</h3>
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6">
+                    <h3 className="text-lg font-bold text-blue-900 mb-2">Executive Summary</h3>
                     <p className="text-blue-800">{report.executive_summary}</p>
                   </div>
                 )}
 
-                {/* Deal Fit Analysis */}
-                {report.deal_fit_analysis && (
-                  <div className="mb-8 pb-8 border-b border-slate-200">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Deal Fit Analysis</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
-                        <p className="text-sm text-slate-600">Fit Score</p>
-                        <p className="text-4xl font-bold text-blue-600">{report.deal_fit_analysis.fit_score}</p>
-                        <p className="text-sm text-slate-600 mt-2">{report.deal_fit_analysis.fit_explanation}</p>
-                      </div>
-                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
-                        <p className="text-sm text-slate-600">Deal Probability</p>
-                        <p className="text-4xl font-bold text-purple-600">{report.deal_probability?.probability_percentage || 'N/A'}%</p>
-                        <p className="text-sm text-slate-600 mt-2">Sales Cycle: {report.deal_probability?.sales_cycle_length || 'N/A'} months</p>
-                      </div>
+                {/* Deal Probability & Strategy */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">Deal Probability</h3>
+                    <div className="text-5xl font-bold text-blue-600 mb-2">{report.deal_probability}%</div>
+                    <p className="text-slate-600 text-sm mb-4">{report.confidence_reasoning}</p>
+                    <div className="w-full bg-slate-200 rounded-full h-3">
+                      <div
+                        className="bg-blue-600 h-3 rounded-full"
+                        style={{ width: `${report.deal_probability}%` }}
+                      />
                     </div>
-                    {report.deal_fit_analysis.user_solution_alignment && (
-                      <div className="p-3 bg-slate-50 rounded">
-                        <p className="font-semibold text-slate-900 mb-1">Solution Alignment</p>
-                        <p className="text-slate-700">{report.deal_fit_analysis.user_solution_alignment}</p>
-                      </div>
-                    )}
                   </div>
-                )}
 
-                {/* Company Overview */}
-                {report.company_name && (
-                  <div className="mb-8 pb-8 border-b border-slate-200">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Company Overview</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-sm text-slate-600">Industry</p>
-                        <p className="text-lg font-semibold text-slate-900">{report.industry}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600">Location</p>
-                        <p className="text-lg font-semibold text-slate-900">{report.location}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600">Company Size</p>
-                        <p className="text-lg font-semibold text-slate-900">{report.company_size}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600">Growth Stage</p>
-                        <p className="text-lg font-semibold text-slate-900">{report.growth_stage}</p>
-                      </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">Sales Cycle</h3>
+                    <p className="text-3xl font-bold text-slate-900 mb-2">{report.sales_cycle_months} months</p>
+                    <p className="text-slate-600 text-sm">Realistic timeline from first contact to close</p>
+                  </div>
+                </div>
+
+                {/* Social Sentiment & Latest Activity */}
+                {report.social_sentiment && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">📱 Social Sentiment & Activity</h3>
+                    <div className="space-y-4">
+                      {report.social_sentiment.recent_linkedin_activity && (
+                        <div>
+                          <p className="font-semibold text-slate-900">Recent LinkedIn Activity</p>
+                          <p className="text-slate-700">{report.social_sentiment.recent_linkedin_activity}</p>
+                        </div>
+                      )}
+                      {report.social_sentiment.sentiment_analysis && (
+                        <div>
+                          <p className="font-semibold text-slate-900">Sentiment Analysis</p>
+                          <p className="text-slate-700">{report.social_sentiment.sentiment_analysis}</p>
+                        </div>
+                      )}
+                      {report.social_sentiment.trending_concerns && (
+                        <div>
+                          <p className="font-semibold text-slate-900">Trending Concerns</p>
+                          <p className="text-slate-700">{report.social_sentiment.trending_concerns}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Pain Signals */}
-                {report.pain_signals_specific && report.pain_signals_specific.length > 0 && (
-                  <div className="mb-8 pb-8 border-b border-slate-200">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Specific Pain Signals</h3>
-                    <div className="space-y-2">
-                      {report.pain_signals_specific.map((pain, idx) => (
-                        <div key={idx} className="p-3 bg-red-50 border border-red-200 rounded text-red-800">
-                          • {pain}
+                {/* Latest Achievements */}
+                {report.latest_achievements && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">🏆 Latest Achievements</h3>
+                    <div className="space-y-3">
+                      {report.latest_achievements.recent_hiring && (
+                        <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                          <p className="font-semibold text-blue-900">Recent Hiring</p>
+                          <p className="text-blue-800 text-sm">{report.latest_achievements.recent_hiring}</p>
+                        </div>
+                      )}
+                      {report.latest_achievements.funding_or_revenue && (
+                        <div className="p-3 bg-green-50 rounded border border-green-200">
+                          <p className="font-semibold text-green-900">Funding/Revenue</p>
+                          <p className="text-green-800 text-sm">{report.latest_achievements.funding_or_revenue}</p>
+                        </div>
+                      )}
+                      {report.latest_achievements.product_launches && (
+                        <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                          <p className="font-semibold text-purple-900">Product Launches</p>
+                          <p className="text-purple-800 text-sm">{report.latest_achievements.product_launches}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Industry Trends */}
+                {report.industry_trends_analysis && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">📊 Industry Trends (Creating Opportunity)</h3>
+                    <div className="space-y-4">
+                      {Object.entries(report.industry_trends_analysis).map(([key, trend], idx) => (
+                        <div key={idx} className="p-4 border border-slate-200 rounded-lg">
+                          <p className="font-semibold text-slate-900">Trend {idx + 1}: {trend.what_is_happening}</p>
+                          <p className="text-slate-700 text-sm mt-2"><strong>Why it matters:</strong> {trend.why_it_matters_to_them}</p>
+                          <p className="text-slate-700 text-sm mt-2"><strong>Creates opportunity:</strong> {trend.creates_opportunity_for}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Ideal Contact Strategy */}
-                {report.ideal_contact_strategy && (
-                  <div className="mb-8 pb-8 border-b border-slate-200">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Outreach Strategy</h3>
+                {/* Actual Problem */}
+                {report.actual_problem_they_face && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                    <h3 className="text-lg font-bold text-red-900 mb-2">🎯 The Actual Problem</h3>
+                    <p className="text-red-800">{report.actual_problem_they_face}</p>
+                  </div>
+                )}
+
+                {/* Buying Trigger & Timeline */}
+                {report.buying_trigger && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">⏰ Buying Trigger (When They're Ready)</h3>
+                    <p className="text-slate-700">{report.buying_trigger}</p>
+                  </div>
+                )}
+
+                {/* Outreach Strategy */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-bold text-slate-900 mb-4">🎯 Outreach Strategy</h3>
+                  <div className="space-y-4">
+                    {report.primary_contact && (
+                      <div>
+                        <p className="font-semibold text-slate-900">Who to Call First</p>
+                        <p className="text-slate-700">{report.primary_contact}</p>
+                      </div>
+                    )}
+                    {report.positioning && (
+                      <div>
+                        <p className="font-semibold text-slate-900">How to Position It</p>
+                        <p className="text-slate-700">{report.positioning}</p>
+                      </div>
+                    )}
+                    {report.call_opening && (
+                      <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                        <p className="font-semibold text-blue-900">Your Call Opening</p>
+                        <p className="text-blue-800 italic">"{report.call_opening}"</p>
+                      </div>
+                    )}
+                    {report.urgency_positioning && (
+                      <div className="bg-orange-50 p-3 rounded border border-orange-200">
+                        <p className="font-semibold text-orange-900">Why NOW (Urgency)</p>
+                        <p className="text-orange-800 text-sm">{report.urgency_positioning}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Deal Strategy Steps */}
+                {report.deal_strategy && Array.isArray(report.deal_strategy) && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">📋 Deal Strategy (5-Step Playbook)</h3>
                     <div className="space-y-3">
-                      {report.ideal_contact_strategy.primary_contact && (
-                        <div>
-                          <p className="font-semibold text-slate-900">Primary Contact</p>
-                          <p className="text-slate-700">{report.ideal_contact_strategy.primary_contact}</p>
+                      {report.deal_strategy.map((step, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 rounded border border-slate-200">
+                          <p className="font-semibold text-slate-900">Step {idx + 1}</p>
+                          <p className="text-slate-700 text-sm">{step}</p>
                         </div>
-                      )}
-                      {report.ideal_contact_strategy.outreach_angle && (
-                        <div>
-                          <p className="font-semibold text-slate-900">Outreach Angle</p>
-                          <p className="text-slate-700">{report.ideal_contact_strategy.outreach_angle}</p>
-                        </div>
-                      )}
-                      {report.ideal_contact_strategy.call_script_opener && (
-                        <div className="bg-blue-50 p-3 rounded">
-                          <p className="font-semibold text-slate-900">How to Start the Call</p>
-                          <p className="text-slate-700 italic">"{report.ideal_contact_strategy.call_script_opener}"</p>
-                        </div>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}
 
                 {/* Risk Assessment */}
-                {report.risk_assessment && (
-                  <div className="mb-8">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Risk Assessment</h3>
-                    {report.risk_assessment.deal_risks && (
-                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 mb-3">
-                        <p className="font-semibold">Deal Risks</p>
-                        <p>{report.risk_assessment.deal_risks}</p>
-                      </div>
-                    )}
-                    {report.risk_assessment.risk_mitigation && (
-                      <div className="p-3 bg-green-50 border border-green-200 rounded text-green-800">
-                        <p className="font-semibold">Mitigation Strategy</p>
-                        <p>{report.risk_assessment.risk_mitigation}</p>
-                      </div>
-                    )}
+                {report.deal_killers && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">⚠️ Deal Killers (What to Avoid)</h3>
+                    <div className="space-y-2">
+                      {report.deal_killers.map((killer, idx) => (
+                        <div key={idx} className="p-3 bg-red-50 border border-red-200 rounded text-red-800">
+                          • {killer}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {/* Confidence Level */}
-                {report.confidence_level && (
-                  <div className="p-3 bg-slate-50 rounded text-slate-700">
-                    <p className="text-sm">
-                      <strong>Confidence Level:</strong> {report.confidence_level.toUpperCase()} - {report.confidence_reasoning}
-                    </p>
-                  </div>
-                )}
+                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <p className="text-sm"><strong>Confidence Level:</strong> {report.confidence_level?.toUpperCase()}</p>
+                  <p className="text-sm text-slate-600 mt-1">{report.confidence_reasoning}</p>
+                </div>
+
+                <button
+                  onClick={() => setShowOutreachGenerator(true)}
+                  className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Generate Outreach Email
+                </button>
               </div>
             )}
 
             {recentResearch.length > 0 && (
-              <div className="bg-white rounded-lg shadow-lg p-8">
+              <div className="bg-white rounded-lg shadow-lg p-8 mt-8">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Research</h3>
                 <div className="space-y-2">
                   {recentResearch.map(research => (
                     <div key={research.id} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
                       <p className="font-semibold text-slate-900">{research.company_name}</p>
-                      <p className="text-sm text-slate-600">Health Score: {research.health_score || 'N/A'} | Industry: {research.industry || 'N/A'}</p>
+                      <p className="text-sm text-slate-600">Fit Score: {research.health_score || 'N/A'} | Industry: {research.industry || 'N/A'}</p>
                     </div>
                   ))}
                 </div>
