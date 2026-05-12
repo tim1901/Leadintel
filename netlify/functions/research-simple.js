@@ -1,5 +1,5 @@
 // netlify/functions/research-simple.js
-// Personalized company research based on user's profile + Claude deep analysis
+// Personalized company research - optimized for speed (5000 tokens)
 
 const Anthropic = require("@anthropic-ai/sdk");
 const { createClient } = require("@supabase/supabase-js");
@@ -27,7 +27,6 @@ async function getUserProfile(userId) {
       return null;
     }
     
-    // Return first result or null if no profile exists
     return data && data.length > 0 ? data[0] : null;
   } catch (err) {
     console.error("getUserProfile error:", err);
@@ -35,167 +34,115 @@ async function getUserProfile(userId) {
   }
 }
 
-// Deep personalized research using Claude
+// Deep personalized research using Claude (5000 tokens - optimized speed)
 async function researchCompanyPersonalized(companyName, userProfile) {
   // Build context about user's solution
   let userContext = "";
   if (userProfile) {
     userContext = `
-The researcher is a ${userProfile.service_name || "business solution provider"}.
-Their offering: ${userProfile.service_description || "B2B solution"}
-Their differentiators: ${userProfile.differentiators?.join(", ") || "N/A"}
-Their messaging style: ${userProfile.messaging_style || "professional"}
+The researcher sells: ${userProfile.service_name || "business solution"}
+How they help: ${userProfile.service_description || "B2B solutions"}
+What makes them different: ${userProfile.differentiators?.join(", ") || "N/A"}
 
-CRITICAL: Research this company specifically for fit with this user's solution. 
-Tailor all recommendations to their service.`;
+CRITICAL: Analyze this company SPECIFICALLY for fit with this user's solution.`;
   } else {
-    userContext = `
-Note: User profile not yet filled in. Provide comprehensive research without personalization.`;
+    userContext = `Note: User profile not filled in. Provide strong general B2B research.`;
   }
 
-  const systemPrompt = `You are an elite business development strategist with 25+ years of enterprise sales experience.
-Your job is to provide DEEP, ACTIONABLE company research that directly identifies deal opportunities.
+  const systemPrompt = `You are an elite business development strategist with 25+ years of experience.
+Provide DEEP, ACTIONABLE company research focused on:
+- Deal fit and opportunity sizing
+- Specific pain points this company faces
+- Decision-makers and organizational structure
+- Budget availability and buying signals
+- Precise outreach strategy
+- Risk assessment
+
+Be specific, not generic. Be honest about confidence levels.
 
 ${userContext}
 
-You analyze companies to identify:
-- Exact fit with the user's solution (not generic)
-- Specific, named pain points (not generic challenges)
-- Real decision-making structures and politics
-- Budget availability and fiscal timing
-- Competitive threats and positioning
-- Deal window opportunities
-- Risk factors that could derail a sale
-- Precise outreach strategy
+Respond ONLY as valid JSON, no markdown or extra text.`;
 
-Be brutally honest. If it's not a fit, say so. If confidence is low, admit it.
+  const userPrompt = `Research this company for B2B sales opportunity: ${companyName}
 
-Respond ONLY in valid JSON format with no additional text, no markdown, no code blocks.`;
-
-  const userPrompt = `Conduct ELITE business development research for: ${companyName}
-
-${userProfile ? `Analyze this company SPECIFICALLY for fit with the user's solution.` : `Provide comprehensive company research for general B2B sales targeting.`}
-
-Provide comprehensive, actionable analysis in this JSON structure:
+Provide analysis in this JSON format:
 
 {
-  "company_name": "Official company name",
-  "industry": "Primary industry/sector",
+  "company_name": "Official name",
+  "industry": "Industry/sector",
   "location": "HQ location",
-  "company_size": "Employee count or range",
+  "company_size": "Employee count estimate",
   "founded_year": "Year if known",
-  "website": "Main website",
-  "revenue_estimate": "Revenue range if available",
+  "website": "Main website if known",
+  "revenue_estimate": "Revenue range estimate",
+  "business_model": "How they make money",
+  "key_products": "Main offerings",
+  "market_position": "Leader/challenger/niche/emerging",
+  "growth_stage": "Early-stage/growth/mature/declining",
   
-  "business_model": "How they make money - specific details",
-  "key_products_services": "Main offerings - specific examples",
-  "market_position": "Market leader, challenger, niche, emerging",
-  "growth_stage": "Early-stage, growth, mature, declining",
-  
-  "organizational_structure": {
-    "relevant_departments": "Which departments matter for this sale",
-    "decision_makers": "Specific roles: CEO, VP Sales, CTO, etc.",
-    "org_politics": "Power dynamics: who influences who, informal leaders",
-    "typical_decision_timeline": "How long do decisions take (weeks/months)"
+  "decision_makers": {
+    "titles": "CEO, VP Sales, CTO, etc",
+    "org_dynamics": "Who really makes decisions, power structure"
   },
   
-  "financial_health": {
-    "cash_position": "Bootstrapped, funded, profitable, burning cash",
-    "recent_funding": "If applicable - amount, series, date",
-    "revenue_trend": "Growing, stable, declining",
-    "budget_availability": "Do they have budget for solutions? When do they decide?"
-  },
-  
-  "pain_signals_specific": [
-    "Specific pain point #1 with evidence",
-    "Specific pain point #2 with evidence",
-    "Specific pain point #3 with evidence"
+  "pain_signals": [
+    "Specific pain point with context",
+    "Specific pain point with context",
+    "Specific pain point with context"
   ],
   
-  "technology_stack": "What tools/software do they use",
-  "current_solutions": "What they're currently using for problems you solve",
-  "switching_costs": "High/low - how hard is it to switch from current solution",
-  
-  "growth_signals": [
-    "Recent hiring in relevant departments",
-    "New product launches",
-    "Geographic expansion",
-    "Market share moves"
-  ],
-  
-  "competitive_landscape": {
-    "main_competitors": "Who they compete with",
-    "market_dynamics": "Is market growing or shrinking",
-    "their_positioning": "How they position themselves"
-  },
+  "financial_health": "Bootstrapped/funded/profitable/burning cash - with reasoning",
+  "budget_likelihood": 1-10,
+  "buying_timeline": "When would they likely decide",
   
   "deal_fit_analysis": {
     "fit_score": 0-100,
-    "fit_explanation": "Why this score - specific reasons",
-    "user_solution_alignment": "How your solution directly addresses their needs",
-    "competitive_advantage": "Why they should choose you over competitors",
-    "potential_objections": "What will they say no to",
-    "how_to_overcome": "How to address those objections"
+    "fit_reasoning": "Why this score - be specific",
+    "solution_alignment": "How your solution solves their problems",
+    "competitive_positioning": "Why choose you over competitors"
   },
   
-  "deal_window_intelligence": {
-    "urgency_signals": "What creates urgency NOW vs later",
-    "fiscal_calendar": "When do they make budget decisions",
-    "product_cycles": "When are they launching/updating products",
-    "best_contact_timing": "When should you reach out",
-    "contact_sequence": "Who to call first, second, third"
-  },
-  
-  "ideal_contact_strategy": {
-    "primary_contact": "Best first contact (name/title if known)",
-    "primary_contact_motivation": "What they care about (KPIs, bonuses, legacy)",
-    "outreach_angle": "SPECIFIC angle for this company - not generic",
-    "messaging": "2-3 key messages tailored to their situation",
-    "social_proof": "What would convince them (case studies, testimonials)",
-    "call_script_opener": "How to start the conversation"
-  },
-  
-  "risk_assessment": {
-    "deal_risks": "What could kill the deal",
-    "implementation_risks": "Implementation challenges",
-    "org_risks": "Organizational changes that could impact",
-    "risk_mitigation": "How to mitigate risks"
-  },
-  
-  "recent_news_and_signals": {
-    "public_news": "Recent announcements, funding, acquisitions",
-    "hiring_signals": "Who are they hiring (signals future direction)",
-    "executive_moves": "Leadership changes",
-    "partnership_news": "New partnerships or integrations"
+  "outreach_strategy": {
+    "primary_contact": "Best first contact role/title",
+    "contact_motivation": "What they care about",
+    "outreach_angle": "SPECIFIC angle for this company",
+    "call_opener": "How to start the conversation",
+    "key_talking_points": ["Point 1", "Point 2", "Point 3"]
   },
   
   "deal_probability": {
-    "probability_percentage": 0-100,
-    "deal_stage_estimate": "Likely where they are in awareness cycle",
-    "sales_cycle_length": "Estimated length in months",
-    "deal_size_estimate": "Potential ACV/contract size if applicable",
-    "close_timeline": "Realistic timeline from first contact to close"
+    "close_probability": "0-100 percentage",
+    "sales_cycle_months": "Estimated length",
+    "estimated_deal_size": "ACV/contract value range"
   },
   
-  "confidence_level": "high/medium/low - how confident in this analysis",
-  "confidence_reasoning": "Why this confidence level",
-  "data_gaps": "What information wasn't available that would help",
+  "risk_factors": {
+    "deal_risks": "What could kill the deal",
+    "mitigation": "How to address risks"
+  },
   
-  "executive_summary": "2-3 sentence summary: is this a go or no-go, and why"
+  "growth_signals": "Recent hiring, funding, expansions, market moves",
+  "competitive_landscape": "Who they compete with, market dynamics",
+  "recent_news": "Announcements, leadership changes, partnerships",
+  
+  "confidence_level": "high/medium/low",
+  "confidence_reasoning": "Why this level",
+  "executive_summary": "Is this a GO or NO-GO and why"
 }
 
 REQUIREMENTS:
-- Be SPECIFIC: Never say "likely faces challenges" - name WHAT challenges
-- Use INFERENCE: For less-known companies, apply industry knowledge and business logic
-- Focus on USER FIT: Every field should answer "how does this relate to the user's solution?"
-- Be HONEST: If confidence is low, say so. If not a fit, say so clearly
-- Actionable: Every insight should guide the sales approach`;
+- Be SPECIFIC: Name exact pain points, not generic ones
+- Focus on FIT: Every insight relates to the user's solution
+- Be HONEST: If not a fit, say so. If confidence is low, admit it
+- Use INFERENCE: For niche/unknown companies, apply business logic
+- ACTIONABLE: Guide the sales approach`;
 
   try {
-    console.log("Calling Claude with personalized prompt...");
+    console.log("Calling Claude with optimized 5000-token prompt...");
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 8000,
+      max_tokens: 5000,  // â† OPTIMIZED for speed
       system: systemPrompt,
       messages: [
         {
@@ -254,7 +201,7 @@ exports.handler = async (event, context) => {
 
     console.log(`Starting research for: ${company_name}${userId ? ` (User: ${userId})` : ""}`);
 
-    // Fetch user profile if userId provided (won't fail if profile doesn't exist)
+    // Fetch user profile if userId provided
     let userProfile = null;
     if (userId) {
       userProfile = await getUserProfile(userId);
