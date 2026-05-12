@@ -1,5 +1,5 @@
 // netlify/functions/research-simple.js
-// ELITE 25-year BD research - DEEP (5000 tokens, 60-second timeout)
+// ELITE 25-year BD research - ROBUST with error handling
 
 const Anthropic = require("@anthropic-ai/sdk");
 const { createClient } = require("@supabase/supabase-js");
@@ -32,154 +32,53 @@ async function getUserProfile(userId) {
   }
 }
 
+function cleanJsonString(str) {
+  // Remove markdown code blocks if present
+  str = str.replace(/^```json\s*/i, '').replace(/```\s*$/, '');
+  str = str.replace(/^```\s*/i, '').replace(/```\s*$/, '');
+  return str.trim();
+}
+
 async function researchCompanyElite(companyName, userProfile) {
   let userContext = "";
   if (userProfile) {
-    userContext = `
-The researcher sells: ${userProfile.service_name || "business solution"}
-How they help: ${userProfile.service_description || "B2B solutions"}
-What makes them different: ${userProfile.differentiators?.join(", ") || "N/A"}
-
-CRITICAL: Analyze this company SPECIFICALLY for fit with this user's solution.`;
-  } else {
-    userContext = `Note: User profile not filled in. Provide strong general B2B research.`;
+    userContext = `Sells: ${userProfile.service_name || "solution"}
+Help: ${userProfile.service_description || "B2B"}
+Different: ${userProfile.differentiators?.join(", ") || "N/A"}`;
   }
 
-  const systemPrompt = `You are an elite business development executive with 25+ years closing enterprise deals.
+  const systemPrompt = `You are a 25-year BD executive. Provide elite research in VALID JSON ONLY.
+No markdown. No code blocks. Just pure JSON.
+${userContext}`;
 
-Your job is to provide DEEP, DEAL-WINNING research that identifies:
-1. REAL problems the company faces (not generic)
-2. WHO specifically makes buying decisions
-3. WHEN they'd be ready to buy (timing + triggers)
-4. HOW to approach them (exact positioning + call script)
-5. What will KILL the deal (risks + objections)
-6. REALISTIC win probability (not optimistic)
-7. SOCIAL PROOF + RECENT SIGNALS showing they're ready
-
-You combine company fundamentals with:
-- Recent social media sentiment (what leaders are saying)
-- Latest achievements (hiring, funding, product launches)
-- Recent executive activity (LinkedIn posts, public statements)
-- Industry trends (what's changing in their space)
-- Urgency signals (what makes this THE RIGHT TIME to sell)
-
-Be specific. Be honest. Be actionable.
-
-${userContext}
-
-Respond ONLY as valid JSON, no markdown.`;
-
-  const userPrompt = `Conduct ELITE business development research for: ${companyName}
-
-Use your knowledge to analyze:
-1. Company fundamentals (size, industry, growth stage)
-2. Recent social media sentiment (what are people saying about this company? LinkedIn posts? News?)
-3. Latest achievements (recent hiring, funding, product launches, partnerships)
-4. Recent executive/founder activity (what have leaders posted about recently?)
-5. Industry trends happening RIGHT NOW that affect this company
-6. How those trends CREATE the problem ${userProfile ? userProfile.service_name + ' solves' : 'your solution solves'}
-7. Urgency positioning (why NOW is the right time to approach them)
-
-Return analysis in this JSON format:
+  const userPrompt = `Research ${companyName} for B2B sales. Return ONLY this JSON (no markdown, no code blocks):
 
 {
-  "company_name": "Official name",
-  "industry": "Industry/sector",
-  "location": "HQ location",
-  "company_size": "Employee count",
-  "growth_stage": "Early/growth/mature/declining",
-  "founded_year": "Year if known",
-  "website": "Main website",
-  
-  "social_sentiment": {
-    "recent_linkedin_activity": "What the company and leaders are posting about (2-3 sample themes)",
-    "sentiment_analysis": "Tone - positive? stressed? excited?",
-    "trending_concerns": "What themes appear repeatedly?",
-    "founder_focus": "What is the CEO/founder publicly focused on?"
-  },
-  
-  "latest_achievements": {
-    "recent_hiring": "Recent hiring announcements or growth signals",
-    "funding_or_revenue": "Recent funding, revenue growth, or financial signals",
-    "product_launches": "New products, features, or market expansion",
-    "partnerships": "New partnerships or integrations",
-    "time_frame": "When did these happen?"
-  },
-  
-  "industry_trends_analysis": {
-    "trend_1": {
-      "what_is_happening": "Specific trend in their industry",
-      "why_it_matters_to_them": "How this affects their business",
-      "creates_opportunity_for": "How this creates the problem you solve"
-    },
-    "trend_2": {
-      "what_is_happening": "Another key trend",
-      "why_it_matters_to_them": "Impact on their business",
-      "creates_opportunity_for": "Problem alignment"
-    }
-  },
-  
-  "actual_problem_they_face": "The REAL problem (not generic). Based on their recent activity, achievements, and industry trends, what is their actual bottleneck?",
-  
-  "buying_trigger": "What specific trigger makes them ready to buy NOW? (time of year, trend forcing action, hiring pattern, etc.)",
-  
-  "primary_contact": "Exact role (who REALLY makes this decision?)",
-  
-  "positioning": "How to position your solution based on their recent activity and industry trends",
-  
-  "call_opening": "First 2 sentences to say when they answer (hook on their specific situation)",
-  
-  "hardest_objection": "Based on their company culture and recent signals, what will they object to?",
-  
-  "how_to_overcome_objection": "Specific counter-argument based on their situation",
-  
-  "deal_probability": 0-100,
-  
-  "deal_strategy": [
-    "Step 1 with specific timing (when to call based on their calendar)",
-    "Step 2: Hook (what to lead with)",
-    "Step 3: Demo/proof (what to show)",
-    "Step 4: Close trigger (how to create urgency)"
-  ],
-  
-  "urgency_positioning": "Based on industry trends and their recent activity, create SPECIFIC messaging about WHY NOW",
-  
-  "readiness_signals": [
-    "Evidence they're ready (from social posts, hiring, achievements)",
-    "LinkedIn indicator to look for",
-    "News source to monitor"
-  ],
-  
-  "deal_size_estimate": "Annual contract value range",
-  
-  "sales_cycle_months": "Realistic timeline",
-  
-  "deal_killers": [
-    "Specific mistake to avoid (based on their culture/recent signals)",
-    "Another deal killer"
-  ],
-  
-  "confidence_level": "high/medium/low",
-  
-  "confidence_reasoning": "Why this level - be honest about what we know vs. don't know",
-  
-  "executive_summary": "2-3 sentence summary: GO or NO-GO and why"
-}
-
-CRITICAL REQUIREMENTS:
-- Use recent social media activity (LinkedIn posts, news, announcements)
-- Base recommendations on ACTUAL trends, not assumptions
-- Match industry trends to THEIR specific problem
-- Create urgency based on real signals, not manipulation
-- Be specific: name the recent achievement, quote themes, cite trends
-- Be honest: if confidence is low, say why
-- Focus on DEAL DYNAMICS, not company description`;
+  "company_name": "Company name",
+  "industry": "Industry",
+  "location": "Location",
+  "company_size": "Size estimate",
+  "social_sentiment": "What leaders recently posted (1 sentence)",
+  "latest_news": "Recent hiring/funding/launches (1 sentence)",
+  "industry_trend": "One key trend (1 sentence)",
+  "actual_problem": "The real problem they face",
+  "buying_trigger": "When they'd buy",
+  "primary_contact": "Who to call first",
+  "positioning": "How to position it",
+  "call_opening": "First 2 sentences to say",
+  "deal_probability": 65,
+  "sales_cycle_months": 3,
+  "deal_killers": ["Avoid this", "Avoid that"],
+  "confidence_level": "medium",
+  "executive_summary": "GO or NO-GO with why"
+}`;
 
   try {
-    console.log("Calling Claude with DEEP ELITE 25-year BD prompt (5000 tokens)...");
+    console.log(`[${new Date().toISOString()}] Starting Claude call for ${companyName}...`);
+    
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 5000, // DEEP analysis
+      max_tokens: 3000,
       system: systemPrompt,
       messages: [
         {
@@ -189,27 +88,28 @@ CRITICAL REQUIREMENTS:
       ],
     });
 
-    const responseText = response.content[0].text;
-    console.log("Claude response received, parsing JSON...");
-
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      console.log("JSON parsed successfully");
-      return parsed;
-    }
+    console.log(`[${new Date().toISOString()}] Claude response received`);
     
-    console.log("Attempting direct JSON parse...");
-    return JSON.parse(responseText);
+    const rawText = response.content[0].text;
+    console.log(`[${new Date().toISOString()}] Raw response length: ${rawText.length}`);
+    
+    // Clean the response
+    const cleanedText = cleanJsonString(rawText);
+    console.log(`[${new Date().toISOString()}] Cleaned response length: ${cleanedText.length}`);
+    
+    // Try to parse
+    console.log(`[${new Date().toISOString()}] Attempting JSON parse...`);
+    const parsed = JSON.parse(cleanedText);
+    console.log(`[${new Date().toISOString()}] JSON parse successful`);
+    
+    return parsed;
   } catch (error) {
-    console.error("Claude API error:", error);
+    console.error(`[${new Date().toISOString()}] Error in researchCompanyElite:`, error.message);
     throw error;
   }
 }
 
 exports.handler = async (event, context) => {
-  // SET TIMEOUT TO 60 SECONDS
   context.callbackWaitsForEmptyEventLoop = false;
   
   const headers = {
@@ -219,7 +119,6 @@ exports.handler = async (event, context) => {
     "Content-Type": "application/json"
   };
 
-  // Handle CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -229,34 +128,37 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { company_name, userId } = JSON.parse(event.body || "{}");
+    console.log(`[${new Date().toISOString()}] Request received`);
+    
+    const body = JSON.parse(event.body || "{}");
+    const { company_name, userId } = body;
 
     if (!company_name || !company_name.trim()) {
+      console.log(`[${new Date().toISOString()}] Missing company_name`);
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({
-          error: "company_name is required"
-        })
+        body: JSON.stringify({ error: "company_name is required" })
       };
     }
 
-    console.log(`Starting DEEP ELITE research for: ${company_name}${userId ? ` (User: ${userId})` : ""}`);
+    console.log(`[${new Date().toISOString()}] Starting research for: ${company_name}`);
 
-    // Fetch user profile if userId provided
     let userProfile = null;
     if (userId) {
+      console.log(`[${new Date().toISOString()}] Fetching profile for userId: ${userId}`);
       userProfile = await getUserProfile(userId);
       if (userProfile) {
-        console.log(`Loaded user profile: ${userProfile.service_name}`);
+        console.log(`[${new Date().toISOString()}] Profile loaded: ${userProfile.service_name}`);
       } else {
-        console.log(`No user profile found for userId: ${userId}`);
+        console.log(`[${new Date().toISOString()}] No profile found`);
       }
     }
 
+    console.log(`[${new Date().toISOString()}] Calling research function...`);
     const research = await researchCompanyElite(company_name, userProfile);
 
-    console.log(`DEEP ELITE research completed for: ${company_name}`);
+    console.log(`[${new Date().toISOString()}] Research completed successfully`);
 
     return {
       statusCode: 200,
@@ -271,7 +173,7 @@ exports.handler = async (event, context) => {
       })
     };
   } catch (error) {
-    console.error("Research function error:", error);
+    console.error(`[${new Date().toISOString()}] Handler error:`, error);
     return {
       statusCode: 500,
       headers,
