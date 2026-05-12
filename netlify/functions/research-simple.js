@@ -1,18 +1,196 @@
 // netlify/functions/research-simple.js
-// Simple wrapper to call the main research orchestrator
+// Personalized company research based on user's profile + Claude deep analysis
 
 const Anthropic = require("@anthropic-ai/sdk");
+const { createClient } = require("@supabase/supabase-js");
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Helper function to call Claude with a specific prompt
-async function callClaude(systemPrompt, userPrompt, model = "claude-sonnet-4-20250514") {
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY
+);
+
+// Fetch user profile from Supabase
+async function getUserProfile(userId) {
   try {
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching user profile:", error);
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.error("getUserProfile error:", err);
+    return null;
+  }
+}
+
+// Deep personalized research using Claude
+async function researchCompanyPersonalized(companyName, userProfile) {
+  // Build context about user's solution
+  let userContext = "";
+  if (userProfile) {
+    userContext = `
+The researcher is a ${userProfile.service_name || "business solution provider"}.
+Their offering: ${userProfile.service_description || "B2B solution"}
+Their differentiators: ${userProfile.differentiators?.join(", ") || "N/A"}
+Their messaging style: ${userProfile.messaging_style || "professional"}
+
+CRITICAL: Research this company specifically for fit with this user's solution. 
+Tailor all recommendations to their service.`;
+  }
+
+  const systemPrompt = `You are an elite business development strategist with 25+ years of enterprise sales experience.
+Your job is to provide DEEP, ACTIONABLE company research that directly identifies deal opportunities.
+
+${userContext}
+
+You analyze companies to identify:
+- Exact fit with the user's solution (not generic)
+- Specific, named pain points (not generic challenges)
+- Real decision-making structures and politics
+- Budget availability and fiscal timing
+- Competitive threats and positioning
+- Deal window opportunities
+- Risk factors that could derail a sale
+- Precise outreach strategy
+
+Be brutally honest. If it's not a fit, say so. If confidence is low, admit it.
+
+Respond ONLY in valid JSON format with no additional text, no markdown, no code blocks.`;
+
+  const userPrompt = `Conduct ELITE business development research for: ${companyName}
+
+Analyze this company SPECIFICALLY for fit with the user's solution.
+Provide comprehensive, actionable analysis in this JSON structure:
+
+{
+  "company_name": "Official company name",
+  "industry": "Primary industry/sector",
+  "location": "HQ location",
+  "company_size": "Employee count or range",
+  "founded_year": "Year if known",
+  "website": "Main website",
+  "revenue_estimate": "Revenue range if available",
+  
+  "business_model": "How they make money - specific details",
+  "key_products_services": "Main offerings - specific examples",
+  "market_position": "Market leader, challenger, niche, emerging",
+  "growth_stage": "Early-stage, growth, mature, declining",
+  
+  "organizational_structure": {
+    "relevant_departments": "Which departments matter for this sale",
+    "decision_makers": "Specific roles: CEO, VP Sales, CTO, etc.",
+    "org_politics": "Power dynamics: who influences who, informal leaders",
+    "typical_decision_timeline": "How long do decisions take (weeks/months)"
+  },
+  
+  "financial_health": {
+    "cash_position": "Bootstrapped, funded, profitable, burning cash",
+    "recent_funding": "If applicable - amount, series, date",
+    "revenue_trend": "Growing, stable, declining",
+    "budget_availability": "Do they have budget for solutions? When do they decide?"
+  },
+  
+  "pain_signals_specific": [
+    "Specific pain point #1 with evidence",
+    "Specific pain point #2 with evidence",
+    "Specific pain point #3 with evidence"
+  ],
+  
+  "technology_stack": "What tools/software do they use",
+  "current_solutions": "What they're currently using for problems you solve",
+  "switching_costs": "High/low - how hard is it to switch from current solution",
+  
+  "growth_signals": [
+    "Recent hiring in relevant departments",
+    "New product launches",
+    "Geographic expansion",
+    "Market share moves"
+  ],
+  
+  "competitive_landscape": {
+    "main_competitors": "Who they compete with",
+    "market_dynamics": "Is market growing or shrinking",
+    "their_positioning": "How they position themselves"
+  },
+  
+  "deal_fit_analysis": {
+    "fit_score": 0-100,
+    "fit_explanation": "Why this score - specific reasons",
+    "user_solution_alignment": "How your solution directly addresses their needs",
+    "competitive_advantage": "Why they should choose you over competitors",
+    "potential_objections": "What will they say no to",
+    "how_to_overcome": "How to address those objections"
+  },
+  
+  "deal_window_intelligence": {
+    "urgency_signals": "What creates urgency NOW vs later",
+    "fiscal_calendar": "When do they make budget decisions",
+    "product_cycles": "When are they launching/updating products",
+    "best_contact_timing": "When should you reach out",
+    "contact_sequence": "Who to call first, second, third"
+  },
+  
+  "ideal_contact_strategy": {
+    "primary_contact": "Best first contact (name/title if known)",
+    "primary_contact_motivation": "What they care about (KPIs, bonuses, legacy)",
+    "outreach_angle": "SPECIFIC angle for this company - not generic",
+    "messaging": "2-3 key messages tailored to their situation",
+    "social_proof": "What would convince them (case studies, testimonials)",
+    "call_script_opener": "How to start the conversation"
+  },
+  
+  "risk_assessment": {
+    "deal_risks": "What could kill the deal",
+    "implementation_risks": "Implementation challenges",
+    "org_risks": "Organizational changes that could impact",
+    "risk_mitigation": "How to mitigate risks"
+  },
+  
+  "recent_news_and_signals": {
+    "public_news": "Recent announcements, funding, acquisitions",
+    "hiring_signals": "Who are they hiring (signals future direction)",
+    "executive_moves": "Leadership changes",
+    "partnership_news": "New partnerships or integrations"
+  },
+  
+  "deal_probability": {
+    "probability_percentage": 0-100,
+    "deal_stage_estimate": "Likely where they are in awareness cycle",
+    "sales_cycle_length": "Estimated length in months",
+    "deal_size_estimate": "Potential ACV/contract size if applicable",
+    "close_timeline": "Realistic timeline from first contact to close"
+  },
+  
+  "confidence_level": "high/medium/low - how confident in this analysis",
+  "confidence_reasoning": "Why this confidence level",
+  "data_gaps": "What information wasn't available that would help",
+  
+  "executive_summary": "2-3 sentence summary: is this a go or no-go, and why"
+}
+
+REQUIREMENTS:
+- Be SPECIFIC: Never say "likely faces challenges" - name WHAT challenges
+- Use INFERENCE: For less-known companies, apply industry knowledge and business logic
+- Focus on USER FIT: Every field should answer "how does this relate to the user's solution?"
+- Be HONEST: If confidence is low, say so. If not a fit, say so clearly
+- Actionable: Every insight should guide the sales approach`;
+
+  try {
+    console.log("Calling Claude with personalized prompt...");
     const response = await client.messages.create({
-      model: model,
-      max_tokens: 2000,
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 8000, // Increased for ultra-deep analysis
       system: systemPrompt,
       messages: [
         {
@@ -22,64 +200,18 @@ async function callClaude(systemPrompt, userPrompt, model = "claude-sonnet-4-202
       ],
     });
 
-    return response.content[0].text;
-  } catch (error) {
-    console.error("Claude API error:", error);
-    throw error;
-  }
-}
+    const responseText = response.content[0].text;
+    console.log("Claude response received");
 
-// Research company using Claude
-async function researchCompany(companyName) {
-  const systemPrompt = `You are a business research specialist. Your job is to find comprehensive information about companies and analyze their fit for B2B solutions.
-
-Research the company thoroughly and provide:
-- Company overview (size, industry, location, founding)
-- Recent news and growth signals
-- Potential pain points and challenges
-- Budget likelihood (1-10 scale)
-- Solution-seeking likelihood (1-10 scale)
-- Engagement recommendations
-
-Format your response as a structured JSON object.`;
-
-  const userPrompt = `Research this company in detail: ${companyName}
-
-Use your knowledge to analyze this company. Provide findings in JSON format:
-{
-  "company_name": "...",
-  "industry": "...",
-  "location": "...",
-  "size_employees": "...",
-  "founded_year": "...",
-  "website": "...",
-  "recent_news": "...",
-  "pain_signals": "...",
-  "budget_likelihood": 0-10,
-  "solution_seeking_likelihood": 0-10,
-  "engagement_recommendation": "...",
-  "health_score": 0-100
-}
-
-Be realistic and insightful.`;
-
-  const response = await callClaude(systemPrompt, userPrompt);
-  
-  try {
-    // Extract JSON from response (Claude might include text before/after JSON)
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    // Extract JSON from response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
-    return JSON.parse(response);
-  } catch (parseError) {
-    console.error("JSON parse error:", parseError);
-    // Return structured response even if parsing fails
-    return {
-      company_name: companyName,
-      error: "Failed to parse research results",
-      raw_response: response
-    };
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error("Claude API error:", error);
+    throw error;
   }
 }
 
@@ -103,7 +235,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { company_name } = JSON.parse(event.body || "{}");
+    const { company_name, userId } = JSON.parse(event.body || "{}");
 
     if (!company_name || !company_name.trim()) {
       return {
@@ -115,16 +247,31 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log(`Researching company: ${company_name}`);
+    console.log(`Starting research for: ${company_name}${userId ? ` (User: ${userId})` : ""}`);
 
-    const research = await researchCompany(company_name);
+    // Fetch user profile if userId provided
+    let userProfile = null;
+    if (userId) {
+      userProfile = await getUserProfile(userId);
+      if (userProfile) {
+        console.log(`Loaded user profile: ${userProfile.service_name}`);
+      }
+    }
+
+    const research = await researchCompanyPersonalized(company_name, userProfile);
+
+    console.log(`Research completed for: ${company_name}`);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        research
+        research,
+        user_context: userProfile ? {
+          service_name: userProfile.service_name,
+          service_description: userProfile.service_description
+        } : null
       })
     };
   } catch (error) {
@@ -133,7 +280,8 @@ exports.handler = async (event, context) => {
       statusCode: 500,
       headers,
       body: JSON.stringify({
-        error: error.message || "Failed to research company"
+        error: error.message || "Failed to research company",
+        details: error.toString()
       })
     };
   }
