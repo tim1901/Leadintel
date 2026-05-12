@@ -8,7 +8,7 @@ const client = new Anthropic({
 });
 
 // Helper function to call Claude with a specific prompt
-async function callClaude(systemPrompt, userPrompt, model = "claude-opus-4-20250805") {
+async function callClaude(systemPrompt, userPrompt, model = "claude-3-5-sonnet-20241022") {
   try {
     const response = await client.messages.create({
       model: model,
