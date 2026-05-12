@@ -1,5 +1,5 @@
 // netlify/functions/research-simple.js
-// ELITE 25-year BD research with social sentiment, news, trends, and urgency positioning
+// ELITE 25-year BD research - DEEP (5000 tokens, 60-second timeout)
 
 const Anthropic = require("@anthropic-ai/sdk");
 const { createClient } = require("@supabase/supabase-js");
@@ -8,13 +8,11 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Initialize Supabase client
 const supabase = createClient(
   process.env.REACT_APP_SUPABASE_URL,
   process.env.REACT_APP_SUPABASE_ANON_KEY
 );
 
-// Fetch user profile from Supabase
 async function getUserProfile(userId) {
   try {
     const { data, error } = await supabase
@@ -34,9 +32,7 @@ async function getUserProfile(userId) {
   }
 }
 
-// Main research function - uses Claude to do EVERYTHING
 async function researchCompanyElite(companyName, userProfile) {
-  // Build user context
   let userContext = "";
   if (userProfile) {
     userContext = `
@@ -49,9 +45,9 @@ CRITICAL: Analyze this company SPECIFICALLY for fit with this user's solution.`;
     userContext = `Note: User profile not filled in. Provide strong general B2B research.`;
   }
 
-  const systemPrompt = `You are an elite business development executive with 25+ years closing deals.
+  const systemPrompt = `You are an elite business development executive with 25+ years closing enterprise deals.
 
-Your job is to provide DEAL-WINNING research that identifies:
+Your job is to provide DEEP, DEAL-WINNING research that identifies:
 1. REAL problems the company faces (not generic)
 2. WHO specifically makes buying decisions
 3. WHEN they'd be ready to buy (timing + triggers)
@@ -96,18 +92,18 @@ Return analysis in this JSON format:
   "website": "Main website",
   
   "social_sentiment": {
-    "recent_linkedin_activity": "What the company and leaders are posting about (sample 2-3 recent posts/themes)",
-    "sentiment_analysis": "Tone - are they positive? stressed? excited? confused?",
-    "trending_concerns": "What themes appear repeatedly in their posts?",
+    "recent_linkedin_activity": "What the company and leaders are posting about (2-3 sample themes)",
+    "sentiment_analysis": "Tone - positive? stressed? excited?",
+    "trending_concerns": "What themes appear repeatedly?",
     "founder_focus": "What is the CEO/founder publicly focused on?"
   },
   
   "latest_achievements": {
-    "recent_hiring": "Any recent hiring announcements? New departments? Growth signals?",
-    "funding_or_revenue": "Recent funding, revenue growth, or financial signals?",
-    "product_launches": "New products, features, or market expansion?",
-    "partnerships": "New partnerships or integrations?",
-    "time_frame": "When did these happen? (weeks/months)"
+    "recent_hiring": "Recent hiring announcements or growth signals",
+    "funding_or_revenue": "Recent funding, revenue growth, or financial signals",
+    "product_launches": "New products, features, or market expansion",
+    "partnerships": "New partnerships or integrations",
+    "time_frame": "When did these happen?"
   },
   
   "industry_trends_analysis": {
@@ -117,7 +113,7 @@ Return analysis in this JSON format:
       "creates_opportunity_for": "How this creates the problem you solve"
     },
     "trend_2": {
-      "what_is_happening": "Another trend",
+      "what_is_happening": "Another key trend",
       "why_it_matters_to_them": "Impact on their business",
       "creates_opportunity_for": "Problem alignment"
     }
@@ -127,11 +123,11 @@ Return analysis in this JSON format:
   
   "buying_trigger": "What specific trigger makes them ready to buy NOW? (time of year, trend forcing action, hiring pattern, etc.)",
   
-  "primary_contact": "Exact role (not generic title). Who REALLY makes this decision?",
+  "primary_contact": "Exact role (who REALLY makes this decision?)",
   
-  "positioning": "How to position your solution based on their recent activity and industry trends (NOT generic)",
+  "positioning": "How to position your solution based on their recent activity and industry trends",
   
-  "call_opening": "First 2 sentences to say when they answer (hook on their specific situation, not generic)",
+  "call_opening": "First 2 sentences to say when they answer (hook on their specific situation)",
   
   "hardest_objection": "Based on their company culture and recent signals, what will they object to?",
   
@@ -140,17 +136,17 @@ Return analysis in this JSON format:
   "deal_probability": 0-100,
   
   "deal_strategy": [
-    "Step 1 with timing (when to call based on their calendar/cycles)",
+    "Step 1 with specific timing (when to call based on their calendar)",
     "Step 2: Hook (what to lead with)",
     "Step 3: Demo/proof (what to show)",
     "Step 4: Close trigger (how to create urgency)"
   ],
   
-  "urgency_positioning": "Based on industry trends and their recent activity, create SPECIFIC messaging about WHY NOW. Not generic.",
+  "urgency_positioning": "Based on industry trends and their recent activity, create SPECIFIC messaging about WHY NOW",
   
   "readiness_signals": [
     "Evidence they're ready (from social posts, hiring, achievements)",
-    "LinkedIn indicator to confirm",
+    "LinkedIn indicator to look for",
     "News source to monitor"
   ],
   
@@ -175,15 +171,15 @@ CRITICAL REQUIREMENTS:
 - Base recommendations on ACTUAL trends, not assumptions
 - Match industry trends to THEIR specific problem
 - Create urgency based on real signals, not manipulation
-- Be specific: name the recent achievement, quote the post, cite the trend
+- Be specific: name the recent achievement, quote themes, cite trends
 - Be honest: if confidence is low, say why
 - Focus on DEAL DYNAMICS, not company description`;
 
   try {
-    console.log("Calling Claude with ELITE 25-year BD prompt...");
+    console.log("Calling Claude with DEEP ELITE 25-year BD prompt (5000 tokens)...");
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 5000, // Stay within safe limit
+      max_tokens: 5000, // DEEP analysis
       system: systemPrompt,
       messages: [
         {
@@ -194,13 +190,17 @@ CRITICAL REQUIREMENTS:
     });
 
     const responseText = response.content[0].text;
-    console.log("Claude research completed");
+    console.log("Claude response received, parsing JSON...");
 
-    // Extract JSON
+    // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log("JSON parsed successfully");
+      return parsed;
     }
+    
+    console.log("Attempting direct JSON parse...");
     return JSON.parse(responseText);
   } catch (error) {
     console.error("Claude API error:", error);
@@ -208,9 +208,10 @@ CRITICAL REQUIREMENTS:
   }
 }
 
-// Main Netlify function
 exports.handler = async (event, context) => {
-  // Enable CORS
+  // SET TIMEOUT TO 60 SECONDS
+  context.callbackWaitsForEmptyEventLoop = false;
+  
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type",
@@ -240,9 +241,9 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log(`Starting ELITE research for: ${company_name}${userId ? ` (User: ${userId})` : ""}`);
+    console.log(`Starting DEEP ELITE research for: ${company_name}${userId ? ` (User: ${userId})` : ""}`);
 
-    // Fetch user profile if provided
+    // Fetch user profile if userId provided
     let userProfile = null;
     if (userId) {
       userProfile = await getUserProfile(userId);
@@ -255,7 +256,7 @@ exports.handler = async (event, context) => {
 
     const research = await researchCompanyElite(company_name, userProfile);
 
-    console.log(`ELITE research completed for: ${company_name}`);
+    console.log(`DEEP ELITE research completed for: ${company_name}`);
 
     return {
       statusCode: 200,
