@@ -16,9 +16,9 @@ export const DashboardComplete = () => {
   const [researching, setResearching] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
-  const [researchType, setResearchType] = useState('GENERIC');
-  const [selectedEmail, setSelectedEmail] = useState(null);
-  const [copiedEmail, setCopiedEmail] = useState(null);
+  const [, setResearchType] = useState('GENERIC');
+const [, setSelectedEmail] = useState(null);
+const [copiedEmail, setCopiedEmail] = useState(null);
 
   const loadProfile = useCallback(async () => {
     try {
