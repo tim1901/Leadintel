@@ -10,15 +10,14 @@ export const DashboardComplete = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const activeTab = searchParams.get('tab') || 'research';
+  
   const [profile, setProfile] = useState(null);
   const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(false);
   const [researching, setResearching] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
-  const [, setResearchType] = useState('GENERIC');
-const [, setSelectedEmail] = useState(null);
-const [copiedEmail, setCopiedEmail] = useState(null);
+  const [copiedEmail, setCopiedEmail] = useState(null);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -59,6 +58,8 @@ const [copiedEmail, setCopiedEmail] = useState(null);
     setResearching(true);
 
     try {
+      console.log(`Starting research for: ${companyName}`);
+
       const response = await fetch('/.netlify/functions/research-simple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,12 +76,10 @@ const [copiedEmail, setCopiedEmail] = useState(null);
       const data = await response.json();
 
       if (!data.success || !data.research) {
-        throw new Error('Invalid response from research API');
+        throw new Error(data.error || 'Invalid response from research API');
       }
 
       setReport(data.research);
-      setResearchType(data.research_type || 'GENERIC');
-      setSelectedEmail(null);
       setCompanyName('');
       setError('');
     } catch (err) {
@@ -172,28 +171,41 @@ const [copiedEmail, setCopiedEmail] = useState(null);
             <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
               <h2 className="text-xl font-bold text-slate-900 mb-4">Service-Specific Company Research</h2>
               <p className="text-sm text-slate-600 mb-4">
-                🎯 Research with news, signals & personalized emails for: <strong>{profile?.service_name || 'Not set'}</strong>
+                🎯 Research with personalized emails for: <strong>{profile?.service_name || 'Not set'}</strong>
               </p>
               <form onSubmit={handleResearch} className="flex gap-4">
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Enter company name"
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter company name (e.g., Andela, Stripe, Microsoft)"
+                  disabled={researching}
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <button
                   type="submit"
                   disabled={researching}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {researching ? 'Researching...' : 'Research'}
+                  {researching ? '⏳ Researching...' : 'Research'}
                 </button>
               </form>
+              {researching && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm text-slate-600">
+                    🔍 Analyzing company and generating personalized emails...
+                  </p>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
+                  </div>
+                  <p className="text-xs text-slate-500">This typically takes 20-40 seconds while Claude researches the company</p>
+                </div>
+              )}
             </div>
 
             {report && (
               <div className="space-y-6">
+                {/* Research Type Badge */}
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <p className="text-sm font-semibold text-green-900">
                     ✅ SERVICE-SPECIFIC RESEARCH WITH PERSONALIZED EMAILS
@@ -220,12 +232,6 @@ const [copiedEmail, setCopiedEmail] = useState(null);
                                 {dm.rank.toUpperCase()}
                               </span>
                             </div>
-                            {dm.recent_posts && dm.recent_posts.length > 0 && (
-                              <div className="mt-2 p-2 bg-white rounded text-xs text-slate-600">
-                                <p className="font-semibold">Recent posts about:</p>
-                                {dm.recent_posts.map((post, i) => <p key={i}>• {post}</p>)}
-                              </div>
-                            )}
                           </div>
 
                           {/* Email Preview */}
@@ -270,16 +276,15 @@ const [copiedEmail, setCopiedEmail] = useState(null);
                     <div className="space-y-3 text-sm text-slate-700">
                       <p><strong>Approach:</strong> {report.email_strategy.approach}</p>
                       <p><strong>Best Timing:</strong> {report.email_strategy.timing}</p>
-                      <div>
-                        <p className="font-semibold">Sequence:</p>
-                        <ol className="list-decimal list-inside ml-2">
-                          {report.email_strategy.sequence?.map((step, i) => (
-                            <li key={i}>{step}</li>
-                          ))}
-                        </ol>
-                      </div>
-                      {report.email_strategy.follow_up_plan && (
-                        <p><strong>Follow-up Plan:</strong> {report.email_strategy.follow_up_plan}</p>
+                      {report.email_strategy.sequence && (
+                        <div>
+                          <p className="font-semibold">Sequence:</p>
+                          <ol className="list-decimal list-inside ml-2">
+                            {report.email_strategy.sequence.map((step, i) => (
+                              <li key={i}>{step}</li>
+                            ))}
+                          </ol>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -288,13 +293,13 @@ const [copiedEmail, setCopiedEmail] = useState(null);
                 {/* Recent News */}
                 {report.recent_news && report.recent_news.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">📰 Recent News (Referenced in Emails)</h3>
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">📰 Recent News</h3>
                     <div className="space-y-3">
                       {report.recent_news.map((news, idx) => (
                         <div key={idx} className="border border-slate-200 rounded p-3">
                           <p className="font-semibold text-slate-900">{news.headline}</p>
                           <p className="text-sm text-slate-600 mt-1">{news.source} - {news.date}</p>
-                          <p className="text-sm text-slate-700 mt-2"><strong>How used:</strong> {news.relevance_to_service}</p>
+                          <p className="text-sm text-slate-700 mt-2"><strong>Relevance:</strong> {news.relevance_to_service}</p>
                           {news.url && (
                             <a href={news.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm mt-2 inline-block">
                               Read article →
