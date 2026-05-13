@@ -61,25 +61,20 @@ export const DashboardComplete = () => {
 
     try {
       console.log(`Starting research for: ${companyName}`);
+      console.log('NO TIMEOUT - will wait indefinitely for response');
 
-      // 10 MINUTE TIMEOUT - Let agents do full work
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        console.log('Frontend timeout after 10 minutes');
-        controller.abort();
-      }, 600000); // 600,000 milliseconds = 10 minutes
-
+      // NO TIMEOUT AT ALL - just fetch and wait
       const response = await fetch('/.netlify/functions/research-simple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           company_name: companyName.trim(),
           userId: user.id
-        }),
-        signal: controller.signal
+        })
+        // NO signal, NO timeout, NO AbortController
       });
 
-      clearTimeout(timeoutId);
+      console.log('Response received, parsing...');
 
       if (!response.ok) {
         throw new Error(`API error: ${response.statusText}`);
@@ -91,6 +86,7 @@ export const DashboardComplete = () => {
         throw new Error(data.error || 'Invalid response from research API');
       }
 
+      console.log('Data parsed successfully');
       setReport(data.research);
       setCompanyName('');
       setError('');
@@ -98,12 +94,7 @@ export const DashboardComplete = () => {
       setVerifiedEmails({});
     } catch (err) {
       console.error('Research error:', err);
-      
-      if (err.name === 'AbortError') {
-        setError('Research timed out after 10 minutes. The Claude API may need more time than expected. Try again.');
-      } else {
-        setError(err.message || 'Failed to research company. Please try again.');
-      }
+      setError(err.message || 'Failed to research company. Please try again.');
     } finally {
       setResearching(false);
     }
@@ -224,7 +215,7 @@ export const DashboardComplete = () => {
                   <div className="w-full bg-slate-200 rounded-full h-2">
                     <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
                   </div>
-                  <p className="text-xs text-slate-500">Taking time to research thoroughly (may take 1-10 minutes - no timeout limits)</p>
+                  <p className="text-xs text-slate-500">⏳ Researching thoroughly - no timeout limits (may take 30-60+ seconds)</p>
                 </div>
               )}
             </div>
