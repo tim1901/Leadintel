@@ -1,14 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getUserProfile, getCompanyResearch, createCompanyResearch } from '../lib/supabaseClient';
-import OutreachGenerator from '../components/OutreachGenerator';
-import CampaignPipelineV2 from '../components/CampaignPipelineV2';
-import Analytics from '../components/Analytics';
-import AdvancedAnalytics from '../components/AdvancedAnalytics';
+import { getUserProfile } from '../lib/supabaseClient';
 import Settings from '../components/Settings';
-import Research from '../components/Research';
-import Outreach from '../components/Outreach';
 
 export const DashboardComplete = () => {
   const { user, signOut } = useAuth();
@@ -16,15 +10,15 @@ export const DashboardComplete = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const activeTab = searchParams.get('tab') || 'research';
-  
   const [profile, setProfile] = useState(null);
   const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(false);
   const [researching, setResearching] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
-  const [recentResearch, setRecentResearch] = useState([]);
-  const [showOutreachGenerator, setShowOutreachGenerator] = useState(false);
+  const [researchType, setResearchType] = useState('GENERIC');
+  const [selectedEmail, setSelectedEmail] = useState(null);
+  const [copiedEmail, setCopiedEmail] = useState(null);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -41,23 +35,13 @@ export const DashboardComplete = () => {
     }
   }, [user?.id]);
 
-  const loadRecentResearch = useCallback(async () => {
-    try {
-      const data = await getCompanyResearch(user.id);
-      setRecentResearch(data || []);
-    } catch (err) {
-      console.error('Error loading recent research:', err);
-    }
-  }, [user?.id]);
-
   useEffect(() => {
     if (!user) {
       navigate('/login');
       return;
     }
     loadProfile();
-    loadRecentResearch();
-  }, [user, navigate, loadProfile, loadRecentResearch]);
+  }, [user, navigate, loadProfile]);
 
   const handleTabChange = (tabId) => {
     setSearchParams({ tab: tabId });
@@ -75,13 +59,9 @@ export const DashboardComplete = () => {
     setResearching(true);
 
     try {
-      console.log(`Starting ELITE research for: ${companyName}`);
-
       const response = await fetch('/.netlify/functions/research-simple', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           company_name: companyName.trim(),
           userId: user.id
@@ -98,23 +78,10 @@ export const DashboardComplete = () => {
         throw new Error('Invalid response from research API');
       }
 
-      const research = data.research;
-
-      if (user.id) {
-        await createCompanyResearch(user.id, {
-          company_name: research.company_name || companyName,
-          industry: research.industry,
-          company_size: research.company_size,
-          location: research.location,
-          website: research.website,
-          health_score: research.deal_probability || 65,
-          pain_signals: research.actual_problem_they_face,
-        });
-      }
-
-      setReport(research);
+      setReport(data.research);
+      setResearchType(data.research_type || 'GENERIC');
+      setSelectedEmail(null);
       setCompanyName('');
-      loadRecentResearch();
       setError('');
     } catch (err) {
       console.error('Research error:', err);
@@ -122,6 +89,13 @@ export const DashboardComplete = () => {
     } finally {
       setResearching(false);
     }
+  };
+
+  const copyEmailToClipboard = (email) => {
+    const emailText = `Subject: ${email.subject_line}\n\n${email.body}`;
+    navigator.clipboard.writeText(emailText);
+    setCopiedEmail(email.subject_line);
+    setTimeout(() => setCopiedEmail(null), 2000);
   };
 
   const handleSignOut = async () => {
@@ -144,11 +118,6 @@ export const DashboardComplete = () => {
 
   const tabs = [
     { id: 'research', label: 'Company Research', icon: '🔍' },
-    { id: 'email', label: 'Find Email', icon: '📧' },
-    { id: 'outreach', label: 'Send Outreach', icon: '✉️' },
-    { id: 'pipeline', label: 'Pipeline', icon: '📊' },
-    { id: 'analytics', label: 'Analytics', icon: '📈' },
-    { id: 'advanced', label: 'Advanced', icon: '🔬' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ];
 
@@ -173,12 +142,12 @@ export const DashboardComplete = () => {
         </div>
 
         <div className="bg-slate-50 border-t border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8 overflow-x-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`py-4 px-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
+                className={`py-4 px-2 border-b-2 font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-slate-600 hover:text-slate-900'
@@ -201,258 +170,209 @@ export const DashboardComplete = () => {
         {activeTab === 'research' && (
           <>
             <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-              <h2 className="text-xl font-bold text-slate-900 mb-4">Elite Company Research</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-4">Service-Specific Company Research</h2>
               <p className="text-sm text-slate-600 mb-4">
-                💡 25-year BD veteran level research: Social sentiment, news, trends, urgency positioning
+                🎯 Research with news, signals & personalized emails for: <strong>{profile?.service_name || 'Not set'}</strong>
               </p>
               <form onSubmit={handleResearch} className="flex gap-4">
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Enter company name (e.g., Tesla, Magdalena's Daughters, Stripe)"
+                  placeholder="Enter company name"
                   className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
                   type="submit"
                   disabled={researching}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
                 >
                   {researching ? 'Researching...' : 'Research'}
                 </button>
               </form>
-              {researching && (
-                <p className="text-sm text-slate-600 mt-4">
-                  🔍 Elite BD research in progress... (analyzing social sentiment, news, trends, and positioning strategy)
-                </p>
-              )}
             </div>
 
             {report && (
               <div className="space-y-6">
-                {/* Executive Summary */}
-                {report.executive_summary && (
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6">
-                    <h3 className="text-lg font-bold text-blue-900 mb-2">Executive Summary</h3>
-                    <p className="text-blue-800">{report.executive_summary}</p>
-                  </div>
-                )}
-
-                {/* Deal Probability & Strategy */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">Deal Probability</h3>
-                    <div className="text-5xl font-bold text-blue-600 mb-2">{report.deal_probability}%</div>
-                    <p className="text-slate-600 text-sm mb-4">{report.confidence_reasoning}</p>
-                    <div className="w-full bg-slate-200 rounded-full h-3">
-                      <div
-                        className="bg-blue-600 h-3 rounded-full"
-                        style={{ width: `${report.deal_probability}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">Sales Cycle</h3>
-                    <p className="text-3xl font-bold text-slate-900 mb-2">{report.sales_cycle_months} months</p>
-                    <p className="text-slate-600 text-sm">Realistic timeline from first contact to close</p>
-                  </div>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-green-900">
+                    ✅ SERVICE-SPECIFIC RESEARCH WITH PERSONALIZED EMAILS
+                  </p>
                 </div>
 
-                {/* Social Sentiment & Latest Activity */}
-                {report.social_sentiment && (
+                {/* Decision Makers & Personalized Emails */}
+                {report.decision_makers && report.decision_makers.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">📱 Social Sentiment & Activity</h3>
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">📧 Personalized Pitch Emails</h3>
+                    
                     <div className="space-y-4">
-                      {report.social_sentiment.recent_linkedin_activity && (
-                        <div>
-                          <p className="font-semibold text-slate-900">Recent LinkedIn Activity</p>
-                          <p className="text-slate-700">{report.social_sentiment.recent_linkedin_activity}</p>
-                        </div>
-                      )}
-                      {report.social_sentiment.sentiment_analysis && (
-                        <div>
-                          <p className="font-semibold text-slate-900">Sentiment Analysis</p>
-                          <p className="text-slate-700">{report.social_sentiment.sentiment_analysis}</p>
-                        </div>
-                      )}
-                      {report.social_sentiment.trending_concerns && (
-                        <div>
-                          <p className="font-semibold text-slate-900">Trending Concerns</p>
-                          <p className="text-slate-700">{report.social_sentiment.trending_concerns}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                      {report.decision_makers.map((dm, idx) => (
+                        <div key={idx} className={`border rounded-lg p-4 ${dm.rank === 'primary' ? 'border-green-500 bg-green-50' : 'border-slate-200'}`}>
+                          {/* Decision Maker Info */}
+                          <div className="mb-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-bold text-slate-900">{dm.name}</p>
+                                <p className="text-sm text-slate-600">{dm.title}</p>
+                                <p className="text-sm text-slate-600">{dm.email}</p>
+                              </div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${dm.rank === 'primary' ? 'bg-green-200 text-green-800' : 'bg-blue-200 text-blue-800'}`}>
+                                {dm.rank.toUpperCase()}
+                              </span>
+                            </div>
+                            {dm.recent_posts && dm.recent_posts.length > 0 && (
+                              <div className="mt-2 p-2 bg-white rounded text-xs text-slate-600">
+                                <p className="font-semibold">Recent posts about:</p>
+                                {dm.recent_posts.map((post, i) => <p key={i}>• {post}</p>)}
+                              </div>
+                            )}
+                          </div>
 
-                {/* Latest Achievements */}
-                {report.latest_achievements && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">🏆 Latest Achievements</h3>
-                    <div className="space-y-3">
-                      {report.latest_achievements.recent_hiring && (
-                        <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                          <p className="font-semibold text-blue-900">Recent Hiring</p>
-                          <p className="text-blue-800 text-sm">{report.latest_achievements.recent_hiring}</p>
-                        </div>
-                      )}
-                      {report.latest_achievements.funding_or_revenue && (
-                        <div className="p-3 bg-green-50 rounded border border-green-200">
-                          <p className="font-semibold text-green-900">Funding/Revenue</p>
-                          <p className="text-green-800 text-sm">{report.latest_achievements.funding_or_revenue}</p>
-                        </div>
-                      )}
-                      {report.latest_achievements.product_launches && (
-                        <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                          <p className="font-semibold text-purple-900">Product Launches</p>
-                          <p className="text-purple-800 text-sm">{report.latest_achievements.product_launches}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                          {/* Email Preview */}
+                          {dm.personalized_email && (
+                            <div className="bg-white rounded border border-slate-200 p-4">
+                              <div className="mb-3">
+                                <p className="text-xs text-slate-600 uppercase tracking-wide">Subject Line</p>
+                                <p className="font-semibold text-slate-900">{dm.personalized_email.subject_line}</p>
+                              </div>
 
-                {/* Industry Trends */}
-                {report.industry_trends_analysis && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">📊 Industry Trends (Creating Opportunity)</h3>
-                    <div className="space-y-4">
-                      {Object.entries(report.industry_trends_analysis).map(([key, trend], idx) => (
-                        <div key={idx} className="p-4 border border-slate-200 rounded-lg">
-                          <p className="font-semibold text-slate-900">Trend {idx + 1}: {trend.what_is_happening}</p>
-                          <p className="text-slate-700 text-sm mt-2"><strong>Why it matters:</strong> {trend.why_it_matters_to_them}</p>
-                          <p className="text-slate-700 text-sm mt-2"><strong>Creates opportunity:</strong> {trend.creates_opportunity_for}</p>
+                              <div className="mb-4 p-3 bg-slate-50 rounded text-sm text-slate-700 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
+                                {dm.personalized_email.body}
+                              </div>
+
+                              {dm.personalized_email.key_points && (
+                                <div className="mb-4 p-3 bg-blue-50 rounded text-xs">
+                                  <p className="font-semibold text-blue-900 mb-2">Key Points in This Email:</p>
+                                  {dm.personalized_email.key_points.map((point, i) => (
+                                    <p key={i} className="text-blue-800">• {point}</p>
+                                  ))}
+                                </div>
+                              )}
+
+                              <button
+                                onClick={() => copyEmailToClipboard(dm.personalized_email)}
+                                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors"
+                              >
+                                {copiedEmail === dm.personalized_email.subject_line ? '✅ Copied!' : '📋 Copy Email'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Actual Problem */}
-                {report.actual_problem_they_face && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                    <h3 className="text-lg font-bold text-red-900 mb-2">🎯 The Actual Problem</h3>
-                    <p className="text-red-800">{report.actual_problem_they_face}</p>
-                  </div>
-                )}
-
-                {/* Buying Trigger & Timeline */}
-                {report.buying_trigger && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">⏰ Buying Trigger (When They're Ready)</h3>
-                    <p className="text-slate-700">{report.buying_trigger}</p>
-                  </div>
-                )}
-
-                {/* Outreach Strategy */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">🎯 Outreach Strategy</h3>
-                  <div className="space-y-4">
-                    {report.primary_contact && (
+                {/* Email Strategy */}
+                {report.email_strategy && (
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">📅 Email Strategy</h3>
+                    <div className="space-y-3 text-sm text-slate-700">
+                      <p><strong>Approach:</strong> {report.email_strategy.approach}</p>
+                      <p><strong>Best Timing:</strong> {report.email_strategy.timing}</p>
                       <div>
-                        <p className="font-semibold text-slate-900">Who to Call First</p>
-                        <p className="text-slate-700">{report.primary_contact}</p>
+                        <p className="font-semibold">Sequence:</p>
+                        <ol className="list-decimal list-inside ml-2">
+                          {report.email_strategy.sequence?.map((step, i) => (
+                            <li key={i}>{step}</li>
+                          ))}
+                        </ol>
                       </div>
-                    )}
-                    {report.positioning && (
-                      <div>
-                        <p className="font-semibold text-slate-900">How to Position It</p>
-                        <p className="text-slate-700">{report.positioning}</p>
-                      </div>
-                    )}
-                    {report.call_opening && (
-                      <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                        <p className="font-semibold text-blue-900">Your Call Opening</p>
-                        <p className="text-blue-800 italic">"{report.call_opening}"</p>
-                      </div>
-                    )}
-                    {report.urgency_positioning && (
-                      <div className="bg-orange-50 p-3 rounded border border-orange-200">
-                        <p className="font-semibold text-orange-900">Why NOW (Urgency)</p>
-                        <p className="text-orange-800 text-sm">{report.urgency_positioning}</p>
-                      </div>
-                    )}
+                      {report.email_strategy.follow_up_plan && (
+                        <p><strong>Follow-up Plan:</strong> {report.email_strategy.follow_up_plan}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Deal Strategy Steps */}
-                {report.deal_strategy && Array.isArray(report.deal_strategy) && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">📋 Deal Strategy (5-Step Playbook)</h3>
+                {/* Recent News */}
+                {report.recent_news && report.recent_news.length > 0 && (
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">📰 Recent News (Referenced in Emails)</h3>
                     <div className="space-y-3">
-                      {report.deal_strategy.map((step, idx) => (
-                        <div key={idx} className="p-3 bg-slate-50 rounded border border-slate-200">
-                          <p className="font-semibold text-slate-900">Step {idx + 1}</p>
-                          <p className="text-slate-700 text-sm">{step}</p>
+                      {report.recent_news.map((news, idx) => (
+                        <div key={idx} className="border border-slate-200 rounded p-3">
+                          <p className="font-semibold text-slate-900">{news.headline}</p>
+                          <p className="text-sm text-slate-600 mt-1">{news.source} - {news.date}</p>
+                          <p className="text-sm text-slate-700 mt-2"><strong>How used:</strong> {news.relevance_to_service}</p>
+                          {news.url && (
+                            <a href={news.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm mt-2 inline-block">
+                              Read article →
+                            </a>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Risk Assessment */}
-                {report.deal_killers && (
+                {/* Executive Social Signals */}
+                {report.executive_social_signals && report.executive_social_signals.length > 0 && (
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">💬 Executive Social Signals</h3>
+                    <div className="space-y-3">
+                      {report.executive_social_signals.map((signal, idx) => (
+                        <div key={idx} className="border border-slate-200 rounded p-3 bg-purple-50">
+                          <p className="font-semibold text-slate-900">{signal.executive_name}</p>
+                          <p className="text-sm text-slate-600">{signal.executive_title} • {signal.platform} - {signal.date}</p>
+                          <p className="text-sm italic text-slate-700 mt-2">"{signal.post}"</p>
+                          <p className="text-sm text-slate-700 mt-2"><strong>Reveals:</strong> {signal.indicates_pain}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pain Points */}
+                {report.pain_points && report.pain_points.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">⚠️ Deal Killers (What to Avoid)</h3>
-                    <div className="space-y-2">
-                      {report.deal_killers.map((killer, idx) => (
-                        <div key={idx} className="p-3 bg-red-50 border border-red-200 rounded text-red-800">
-                          • {killer}
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">🚨 Pain Points</h3>
+                    <div className="space-y-3">
+                      {report.pain_points.map((pain, idx) => (
+                        <div key={idx} className="border border-slate-200 rounded p-3">
+                          <p className="font-semibold text-slate-900">{pain.pain_point_name}</p>
+                          <p className="text-sm text-slate-700 mt-1">{pain.description}</p>
+                          <p className="text-sm text-slate-700 mt-2"><strong>Your solution:</strong> {pain.how_your_service_solves_it}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Confidence Level */}
-                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                  <p className="text-sm"><strong>Confidence Level:</strong> {report.confidence_level?.toUpperCase()}</p>
-                  <p className="text-sm text-slate-600 mt-1">{report.confidence_reasoning}</p>
-                </div>
-
-                <button
-                  onClick={() => setShowOutreachGenerator(true)}
-                  className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-                >
-                  Generate Outreach Email
-                </button>
-              </div>
-            )}
-
-            {recentResearch.length > 0 && (
-              <div className="bg-white rounded-lg shadow-lg p-8 mt-8">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Research</h3>
-                <div className="space-y-2">
-                  {recentResearch.map(research => (
-                    <div key={research.id} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
-                      <p className="font-semibold text-slate-900">{research.company_name}</p>
-                      <p className="text-sm text-slate-600">Fit Score: {research.health_score || 'N/A'} | Industry: {research.industry || 'N/A'}</p>
+                {/* ROI */}
+                {report.roi_calculation && (
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">💰 ROI</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-slate-50 rounded">
+                        <p className="text-sm text-slate-600">Annual Savings</p>
+                        <p className="text-xl font-bold text-green-600">{report.roi_calculation.annual_savings}</p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded">
+                        <p className="text-sm text-slate-600">Payback Period</p>
+                        <p className="text-xl font-bold text-slate-900">{report.roi_calculation.payback_period}</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
+
+                {/* Next Steps */}
+                {report.next_steps && (
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">🚀 Next Steps</h3>
+                    <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700">
+                      {report.next_steps.map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
               </div>
             )}
           </>
         )}
 
-        {activeTab === 'email' && <Research />}
-        {activeTab === 'outreach' && <Outreach />}
-        {activeTab === 'pipeline' && <CampaignPipelineV2 userId={user?.id} />}
-        {activeTab === 'analytics' && <Analytics userId={user?.id} />}
-        {activeTab === 'advanced' && <AdvancedAnalytics userId={user?.id} />}
         {activeTab === 'settings' && <Settings userId={user?.id} />}
-
-        {showOutreachGenerator && report && (
-          <OutreachGenerator
-            research={report}
-            onClose={() => setShowOutreachGenerator(false)}
-            onOutreachGenerated={() => {
-              setShowOutreachGenerator(false);
-              loadRecentResearch();
-            }}
-          />
-        )}
       </div>
     </div>
   );
