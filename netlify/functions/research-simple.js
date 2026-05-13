@@ -1,5 +1,5 @@
 // netlify/functions/research-simple.js
-// WITH TIMEOUT PROTECTION
+// CLEAN CLAUDE RESEARCH - No hardcoding, no timeouts
 
 const Anthropic = require("@anthropic-ai/sdk");
 const { createClient } = require("@supabase/supabase-js");
@@ -19,44 +19,35 @@ async function getUserProfile(userId) {
       .from("user_profiles")
       .select("*")
       .eq("id", userId);
-
-    if (error) return null;
     return data && data.length > 0 ? data[0] : null;
   } catch (err) {
-    console.error("getUserProfile error:", err);
+    console.error("Error fetching profile:", err);
     return null;
   }
 }
 
-// Promise with timeout
-function promiseWithTimeout(promise, timeoutMs) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Claude API timeout')), timeoutMs)
-    )
-  ]);
-}
-
 async function generateResearch(companyName, userProfile) {
   const serviceName = userProfile?.service_name || "business solution";
+  const serviceDesc = userProfile?.service_description || "";
 
-  console.log(`Researching ${companyName} for ${serviceName}`);
+  console.log(`[RESEARCH] Starting for ${companyName}`);
+  console.log(`[SERVICE] ${serviceName}`);
 
-  const systemPrompt = `You are a research expert. Return ONLY valid JSON, no markdown.`;
+  const prompt = `Research ${companyName} for selling "${serviceName}". 
 
-  const userPrompt = `Research ${companyName} and return JSON:
+Return ONLY valid JSON (no markdown, no code blocks):
 
 {
   "company_name": "${companyName}",
   "service_being_sold": "${serviceName}",
   "opportunity_summary": {
-    "opportunity_level": "HIGH",
-    "why": "Brief reason this company needs your service"
+    "opportunity_level": "HIGH/MEDIUM/LOW",
+    "urgency_level": "HIGH/MEDIUM/LOW",
+    "why": "Why they need this service"
   },
   "pain_points": [
     {
-      "pain_point_name": "Problem they face",
+      "pain_point_name": "Problem name",
       "description": "What it costs them",
       "how_your_service_solves_it": "Your solution"
     }
@@ -64,92 +55,87 @@ async function generateResearch(companyName, userProfile) {
   "recent_news": [
     {
       "date": "2026-05-10",
-      "headline": "Recent company news",
-      "source": "TechCrunch",
-      "relevance_to_service": "Why it matters"
+      "headline": "News headline",
+      "source": "Source name",
+      "url": "https://example.com",
+      "relevance_to_service": "Why it matters for selling your service"
+    }
+  ],
+  "executive_social_signals": [
+    {
+      "executive_name": "Name",
+      "executive_title": "Title",
+      "platform": "LinkedIn",
+      "date": "2026-05-08",
+      "post": "What they said",
+      "indicates_pain": "What this reveals",
+      "opportunity": "How your service helps"
     }
   ],
   "decision_makers": [
     {
       "rank": "primary",
-      "name": "CEO or Operations Lead",
-      "title": "Title",
-      "email": "info@company.com",
+      "name": "Full name",
+      "title": "Job title",
+      "email": "firstname.lastname@company.com",
+      "linkedin": "linkedin.com/in/name",
+      "why_this_person": "Why they own this pain",
+      "how_your_service_helps_them": "Specific benefit for them",
       "personalized_email": {
-        "subject_line": "Compelling subject",
-        "body": "Hi,\\n\\nShort email body.\\n\\nBest regards",
-        "key_points": ["Point 1"]
+        "subject_line": "Compelling subject mentioning company or trend",
+        "body": "Hi [Name],\\n\\n[Hook with specific signal]\\n\\n[Problem statement]\\n\\n[Solution]\\n\\n[CTA]\\n\\nBest regards,\\n[Your Name]",
+        "key_points": ["Reference 1", "Reference 2", "Reference 3"]
       }
     }
   ],
-  "roi_calculation": {
-    "annual_savings": "Estimated savings",
-    "payback_period": "3-6 months"
+  "email_strategy": {
+    "approach": "How to approach",
+    "timing": "Best time to send",
+    "sequence": ["Step 1", "Step 2", "Step 3"]
   },
-  "next_steps": ["Step 1", "Step 2"],
-  "research_summary": "Brief summary"
+  "roi_calculation": {
+    "current_cost": "What they spend now",
+    "annual_savings": "Estimated savings",
+    "payback_period": "Timeline"
+  },
+  "next_steps": ["Action 1", "Action 2"],
+  "research_summary": "2-3 sentence summary with specific signals"
 }`;
 
   try {
-    console.log("Calling Claude with 15 second timeout...");
+    console.log("[CLAUDE] Calling API...");
     
-    const response = await promiseWithTimeout(
-      client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-      15000 // 15 second timeout
-    );
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 3000,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    });
 
-    console.log("Claude responded");
-    const text = response.content[0].text;
+    console.log("[CLAUDE] Response received");
     
-    // Clean and parse
-    let json = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+    const text = response.content[0].text;
+    console.log("[PARSE] Parsing JSON...");
+    
+    // Clean JSON
+    let json = text.trim();
+    if (json.startsWith("```json")) json = json.slice(7);
+    if (json.startsWith("```")) json = json.slice(3);
+    if (json.endsWith("```")) json = json.slice(0, -3);
+    json = json.trim();
+    
     const data = JSON.parse(json);
-    console.log("Research complete");
+    console.log("[SUCCESS] Research complete");
+    
     return data;
 
   } catch (error) {
-    console.error("Claude error:", error.message);
-    
-    // Return fallback
-    return {
-      company_name: companyName,
-      service_being_sold: serviceName,
-      opportunity_summary: {
-        opportunity_level: "MEDIUM",
-        why: "Companies need optimization"
-      },
-      pain_points: [
-        {
-          pain_point_name: "Operational efficiency",
-          description: "Need to optimize",
-          how_your_service_solves_it: "Provides solutions"
-        }
-      ],
-      decision_makers: [
-        {
-          rank: "primary",
-          name: "Leadership",
-          title: "Executive",
-          email: "info@company.com",
-          personalized_email: {
-            subject_line: `${companyName} - Efficiency Opportunity`,
-            body: `Hi,\n\nI help companies like ${companyName} improve operations.\n\nWorth a quick chat?\n\nBest regards`,
-            key_points: ["References company", "Clear value", "CTA"]
-          }
-        }
-      ],
-      roi_calculation: {
-        annual_savings: "Varies",
-        payback_period: "3-6 months"
-      },
-      next_steps: ["Contact company", "Schedule call"],
-      research_summary: "Research generated (fallback mode)"
-    };
+    console.error("[CLAUDE] Error:", error.message);
+    throw error;
   }
 }
 
@@ -168,11 +154,12 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    console.log("[START] Request received");
+    console.log("[HANDLER] Request received");
     
     const { company_name, userId } = JSON.parse(event.body || "{}");
 
     if (!company_name?.trim()) {
+      console.log("[ERROR] Missing company_name");
       return {
         statusCode: 400,
         headers,
@@ -180,17 +167,23 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log(`[RESEARCH] ${company_name}`);
+    console.log(`[HANDLER] Researching: ${company_name}`);
 
     let userProfile = null;
     if (userId) {
+      console.log("[HANDLER] Fetching profile...");
       userProfile = await getUserProfile(userId);
-      console.log(`[PROFILE] ${userProfile ? 'Found' : 'Not found'}`);
+      if (userProfile) {
+        console.log(`[HANDLER] Profile found: ${userProfile.service_name}`);
+      } else {
+        console.log("[HANDLER] No profile found");
+      }
     }
 
+    console.log("[HANDLER] Calling research function");
     const research = await generateResearch(company_name, userProfile);
 
-    console.log("[SUCCESS] Returning research");
+    console.log("[HANDLER] Returning response");
 
     return {
       statusCode: 200,
@@ -198,19 +191,23 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         research,
-        research_type: userProfile?.service_name ? "SERVICE-SPECIFIC" : "GENERIC"
+        research_type: userProfile?.service_name ? "SERVICE-SPECIFIC" : "GENERIC",
+        user_context: userProfile ? {
+          service_name: userProfile.service_name
+        } : null
       })
     };
 
   } catch (error) {
-    console.error("[ERROR]", error.message);
+    console.error("[HANDLER] FATAL ERROR:", error.message);
     
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message,
+        help: "Check that ANTHROPIC_API_KEY is set in Netlify environment variables"
       })
     };
   }
