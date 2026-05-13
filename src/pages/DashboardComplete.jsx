@@ -18,6 +18,8 @@ export const DashboardComplete = () => {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [copiedEmail, setCopiedEmail] = useState(null);
+  const [activeEmailIdx, setActiveEmailIdx] = useState(0);
+  const [verifiedEmails, setVerifiedEmails] = useState({});
 
   const loadProfile = useCallback(async () => {
     try {
@@ -82,6 +84,8 @@ export const DashboardComplete = () => {
       setReport(data.research);
       setCompanyName('');
       setError('');
+      setActiveEmailIdx(0);
+      setVerifiedEmails({});
     } catch (err) {
       console.error('Research error:', err);
       setError(err.message || 'Failed to research company. Please try again.');
@@ -95,6 +99,13 @@ export const DashboardComplete = () => {
     navigator.clipboard.writeText(emailText);
     setCopiedEmail(email.subject_line);
     setTimeout(() => setCopiedEmail(null), 2000);
+  };
+
+  const toggleEmailVerified = (email) => {
+    setVerifiedEmails(prev => ({
+      ...prev,
+      [email]: !prev[email]
+    }));
   };
 
   const handleSignOut = async () => {
@@ -169,207 +180,262 @@ export const DashboardComplete = () => {
         {activeTab === 'research' && (
           <>
             <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-              <h2 className="text-xl font-bold text-slate-900 mb-4">Service-Specific Company Research</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-4">Multi-Agent Company Intelligence</h2>
               <p className="text-sm text-slate-600 mb-4">
-                🎯 Research with personalized emails for: <strong>{profile?.service_name || 'Not set'}</strong>
+                🎯 AI-powered research with Company Intel → Email Discovery → Synthesis → BD Strategy for: <strong>{profile?.service_name || 'Not set'}</strong>
               </p>
               <form onSubmit={handleResearch} className="flex gap-4">
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Enter company name (e.g., Andela, Stripe, Microsoft)"
+                  placeholder="Enter company name"
                   disabled={researching}
                   className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <button
                   type="submit"
                   disabled={researching}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {researching ? '⏳ Researching...' : 'Research'}
+                  {researching ? '🤖 Researching...' : 'Research'}
                 </button>
               </form>
               {researching && (
                 <div className="mt-4 space-y-2">
                   <p className="text-sm text-slate-600">
-                    🔍 Analyzing company and generating personalized emails...
+                    🤖 Agent 1: Company Research + Email Discovery • Agent 2: Synthesis • Agent 3: BD Strategy
                   </p>
                   <div className="w-full bg-slate-200 rounded-full h-2">
                     <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
                   </div>
-                  <p className="text-xs text-slate-500">This typically takes 20-40 seconds while Claude researches the company</p>
+                  <p className="text-xs text-slate-500">No timeout - researching thoroughly (may take 60+ seconds)</p>
                 </div>
               )}
             </div>
 
             {report && (
               <div className="space-y-6">
-                {/* Research Type Badge */}
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-green-900">
-                    ✅ SERVICE-SPECIFIC RESEARCH WITH PERSONALIZED EMAILS
-                  </p>
-                </div>
-
-                {/* Decision Makers & Personalized Emails */}
-                {report.decision_makers && report.decision_makers.length > 0 && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">📧 Personalized Pitch Emails</h3>
-                    
-                    <div className="space-y-4">
-                      {report.decision_makers.map((dm, idx) => (
-                        <div key={idx} className={`border rounded-lg p-4 ${dm.rank === 'primary' ? 'border-green-500 bg-green-50' : 'border-slate-200'}`}>
-                          {/* Decision Maker Info */}
-                          <div className="mb-4">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-bold text-slate-900">{dm.name}</p>
-                                <p className="text-sm text-slate-600">{dm.title}</p>
-                                <p className="text-sm text-slate-600">{dm.email}</p>
-                              </div>
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${dm.rank === 'primary' ? 'bg-green-200 text-green-800' : 'bg-blue-200 text-blue-800'}`}>
-                                {dm.rank.toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Email Preview */}
-                          {dm.personalized_email && (
-                            <div className="bg-white rounded border border-slate-200 p-4">
-                              <div className="mb-3">
-                                <p className="text-xs text-slate-600 uppercase tracking-wide">Subject Line</p>
-                                <p className="font-semibold text-slate-900">{dm.personalized_email.subject_line}</p>
-                              </div>
-
-                              <div className="mb-4 p-3 bg-slate-50 rounded text-sm text-slate-700 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
-                                {dm.personalized_email.body}
-                              </div>
-
-                              {dm.personalized_email.key_points && (
-                                <div className="mb-4 p-3 bg-blue-50 rounded text-xs">
-                                  <p className="font-semibold text-blue-900 mb-2">Key Points in This Email:</p>
-                                  {dm.personalized_email.key_points.map((point, i) => (
-                                    <p key={i} className="text-blue-800">• {point}</p>
-                                  ))}
-                                </div>
-                              )}
-
-                              <button
-                                onClick={() => copyEmailToClipboard(dm.personalized_email)}
-                                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors"
-                              >
-                                {copiedEmail === dm.personalized_email.subject_line ? '✅ Copied!' : '📋 Copy Email'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                {/* STEP 1: COMPANY SUMMARY */}
+                {report.company_summary && (
+                  <div className="bg-white rounded-lg shadow p-8 border-l-4 border-blue-500">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-700 font-bold">1</span>
+                      <h3 className="text-lg font-bold text-slate-900">Company Summary</h3>
+                    </div>
+                    <div className="prose prose-sm max-w-none text-slate-700 space-y-3">
+                      {report.company_summary.split('\n').filter(p => p.trim()).map((paragraph, idx) => (
+                        <p key={idx}>{paragraph}</p>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Email Strategy */}
-                {report.email_strategy && (
-                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">📅 Email Strategy</h3>
-                    <div className="space-y-3 text-sm text-slate-700">
-                      <p><strong>Approach:</strong> {report.email_strategy.approach}</p>
-                      <p><strong>Best Timing:</strong> {report.email_strategy.timing}</p>
-                      {report.email_strategy.sequence && (
-                        <div>
-                          <p className="font-semibold">Sequence:</p>
-                          <ol className="list-decimal list-inside ml-2">
-                            {report.email_strategy.sequence.map((step, i) => (
-                              <li key={i}>{step}</li>
-                            ))}
-                          </ol>
-                        </div>
-                      )}
+                {/* STEP 2: OPPORTUNITY FIT */}
+                {report.opportunity_fit && (
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg shadow p-6 border border-green-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-green-100 text-green-700 font-bold">2</span>
+                      <h3 className="text-lg font-bold text-green-900">Opportunity Fit</h3>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm text-green-700">Alignment Score</p>
+                        <p className="text-3xl font-bold text-green-600">{report.opportunity_fit.alignment_score}/10</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-sm text-green-700 font-semibold">Why This Fit Is Strong</p>
+                        <p className="text-sm text-green-800 mt-1">{report.opportunity_fit.why}</p>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Recent News */}
-                {report.recent_news && report.recent_news.length > 0 && (
-                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">📰 Recent News</h3>
-                    <div className="space-y-3">
-                      {report.recent_news.map((news, idx) => (
-                        <div key={idx} className="border border-slate-200 rounded p-3">
-                          <p className="font-semibold text-slate-900">{news.headline}</p>
-                          <p className="text-sm text-slate-600 mt-1">{news.source} - {news.date}</p>
-                          <p className="text-sm text-slate-700 mt-2"><strong>Relevance:</strong> {news.relevance_to_service}</p>
-                          {news.url && (
-                            <a href={news.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm mt-2 inline-block">
-                              Read article →
-                            </a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Executive Social Signals */}
-                {report.executive_social_signals && report.executive_social_signals.length > 0 && (
-                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">💬 Executive Social Signals</h3>
-                    <div className="space-y-3">
-                      {report.executive_social_signals.map((signal, idx) => (
-                        <div key={idx} className="border border-slate-200 rounded p-3 bg-purple-50">
-                          <p className="font-semibold text-slate-900">{signal.executive_name}</p>
-                          <p className="text-sm text-slate-600">{signal.executive_title} • {signal.platform} - {signal.date}</p>
-                          <p className="text-sm italic text-slate-700 mt-2">"{signal.post}"</p>
-                          <p className="text-sm text-slate-700 mt-2"><strong>Reveals:</strong> {signal.indicates_pain}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Pain Points */}
+                {/* STEP 3: PAIN POINTS */}
                 {report.pain_points && report.pain_points.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">🚨 Pain Points</h3>
-                    <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-orange-100 text-orange-700 font-bold">3</span>
+                      <h3 className="text-lg font-bold text-slate-900">Pain Points Analysis</h3>
+                    </div>
+                    <div className="space-y-4">
                       {report.pain_points.map((pain, idx) => (
-                        <div key={idx} className="border border-slate-200 rounded p-3">
-                          <p className="font-semibold text-slate-900">{pain.pain_point_name}</p>
-                          <p className="text-sm text-slate-700 mt-1">{pain.description}</p>
-                          <p className="text-sm text-slate-700 mt-2"><strong>Your solution:</strong> {pain.how_your_service_solves_it}</p>
+                        <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="font-bold text-slate-900">{pain.pain_point}</p>
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              pain.severity === 'CRITICAL' ? 'bg-red-100 text-red-800' :
+                              pain.severity === 'HIGH' ? 'bg-orange-100 text-orange-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {pain.severity}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-700 mb-2">{pain.why_they_have_it}</p>
+                          <p className="text-sm text-slate-600 mb-2"><strong>Evidence:</strong> {pain.evidence}</p>
+                          <p className="text-sm text-blue-700"><strong>Solution:</strong> {pain.how_service_solves}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* ROI */}
-                {report.roi_calculation && (
-                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">💰 ROI</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 bg-slate-50 rounded">
-                        <p className="text-sm text-slate-600">Annual Savings</p>
-                        <p className="text-xl font-bold text-green-600">{report.roi_calculation.annual_savings}</p>
+                {/* STEP 4: TIMING SIGNALS */}
+                {report.timing_signals && (
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-orange-100 text-orange-700 font-bold">4</span>
+                      <h3 className="text-lg font-bold text-slate-900">Timing & Opportunity Signals</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      {Object.entries(report.timing_signals).map(([key, value]) => (
+                        <div key={key} className="p-3 bg-slate-50 rounded">
+                          <p className="font-semibold text-slate-900 capitalize">{key}</p>
+                          <p className="text-slate-700 mt-1">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 5: BD STRATEGY */}
+                {report.pitch_strategy && (
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-red-100 text-red-700 font-bold">5</span>
+                      <h3 className="text-lg font-bold text-slate-900">BD Strategy</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Opening Hook (Lead With This):</p>
+                        <p className="text-sm text-slate-700 mt-1 p-2 bg-red-50 rounded italic">"{report.pitch_strategy.opening_hook}"</p>
                       </div>
-                      <div className="p-3 bg-slate-50 rounded">
-                        <p className="text-sm text-slate-600">Payback Period</p>
-                        <p className="text-xl font-bold text-slate-900">{report.roi_calculation.payback_period}</p>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Why Now (Urgency):</p>
+                        <p className="text-sm text-slate-700 mt-1">{report.pitch_strategy.why_now}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Differentiation:</p>
+                        <p className="text-sm text-slate-700 mt-1">{report.pitch_strategy.differentiation}</p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Next Steps */}
-                {report.next_steps && (
-                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">🚀 Next Steps</h3>
-                    <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700">
-                      {report.next_steps.map((step, idx) => (
-                        <li key={idx}>{step}</li>
+                {/* STEP 6: EMAIL DISCOVERY */}
+                {report.email_discovery && report.email_discovery.emails_found && report.email_discovery.emails_found.length > 0 && (
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg shadow p-6 border border-green-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-green-100 text-green-700 font-bold">6</span>
+                      <h3 className="text-lg font-bold text-green-900">Discovered Email Addresses ({report.email_discovery.emails_found.length})</h3>
+                    </div>
+                    <p className="text-sm text-green-700 mb-4">Domain: <strong>{report.email_discovery.domain}</strong> • Pattern: {report.email_discovery.common_patterns[0]}</p>
+                    <div className="space-y-3">
+                      {report.email_discovery.emails_found.map((email, idx) => (
+                        <div key={idx} className={`p-3 rounded border-2 transition-colors ${
+                          verifiedEmails[email.email] 
+                            ? 'bg-white border-green-400 bg-green-50' 
+                            : 'bg-white border-orange-300 bg-orange-50'
+                        }`}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <p className="font-mono font-semibold text-slate-900">{email.email}</p>
+                              <p className="text-sm text-slate-700 mt-1">{email.name} • {email.title}</p>
+                              <p className="text-xs text-slate-600 mt-1">
+                                <strong>Found in:</strong> {email.source}
+                              </p>
+                            </div>
+                            <div className="ml-4 text-right">
+                              <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                                email.confidence === 'HIGH' ? 'bg-green-200 text-green-800' :
+                                email.confidence === 'MEDIUM' ? 'bg-yellow-200 text-yellow-800' :
+                                'bg-red-200 text-red-800'
+                              }`}>
+                                {email.confidence}
+                              </span>
+                              <button
+                                onClick={() => toggleEmailVerified(email.email)}
+                                className={`block w-20 mt-2 px-2 py-1 text-xs font-semibold rounded transition-colors ${
+                                  verifiedEmails[email.email]
+                                    ? 'bg-green-600 text-white hover:bg-green-700'
+                                    : 'bg-slate-300 text-slate-700 hover:bg-slate-400'
+                                }`}
+                              >
+                                {verifiedEmails[email.email] ? '✓ Verified' : 'Mark OK'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </ol>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 7: PERSONALIZED EMAILS (LAST) */}
+                {report.personalized_emails && report.personalized_emails.length > 0 && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-purple-100 text-purple-700 font-bold">7</span>
+                      <h3 className="text-lg font-bold text-slate-900">Personalized Emails Ready to Send ({report.personalized_emails.length} variants)</h3>
+                    </div>
+                    
+                    <div className="flex gap-2 mb-4 border-b border-slate-200 overflow-x-auto">
+                      {report.personalized_emails.map((email, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setActiveEmailIdx(idx)}
+                          className={`py-2 px-4 font-medium border-b-2 transition-colors whitespace-nowrap ${
+                            activeEmailIdx === idx
+                              ? 'border-purple-600 text-purple-600'
+                              : 'border-transparent text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {email.target_name}
+                        </button>
+                      ))}
+                    </div>
+
+                    {report.personalized_emails[activeEmailIdx] && (
+                      <div className="space-y-4">
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                          <p className="text-xs text-purple-700 font-semibold uppercase">Sending To</p>
+                          <p className="font-mono font-bold text-slate-900 mt-1">{report.personalized_emails[activeEmailIdx].target_email}</p>
+                          <p className="text-sm text-slate-700">{report.personalized_emails[activeEmailIdx].target_name} • {report.personalized_emails[activeEmailIdx].target_title}</p>
+                          {report.personalized_emails[activeEmailIdx].email_source && (
+                            <p className="text-xs text-purple-600 mt-1">📍 Email discovered from: {report.personalized_emails[activeEmailIdx].email_source}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-slate-600 uppercase tracking-wide font-semibold">Subject Line</p>
+                          <p className="font-semibold text-slate-900 mt-2 text-base">{report.personalized_emails[activeEmailIdx].subject_line}</p>
+                        </div>
+
+                        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap font-mono leading-relaxed">
+                            {report.personalized_emails[activeEmailIdx].body}
+                          </p>
+                        </div>
+
+                        {report.personalized_emails[activeEmailIdx].key_references && (
+                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                            <p className="text-sm font-semibold text-blue-900">Research References in This Email:</p>
+                            <ul className="list-disc list-inside mt-2 text-sm text-blue-800">
+                              {report.personalized_emails[activeEmailIdx].key_references.map((ref, i) => (
+                                <li key={i}>{ref}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => copyEmailToClipboard(report.personalized_emails[activeEmailIdx])}
+                          className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors"
+                        >
+                          {copiedEmail === report.personalized_emails[activeEmailIdx].subject_line ? '✅ Copied to Clipboard!' : '📋 Copy Email (Subject + Body)'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
